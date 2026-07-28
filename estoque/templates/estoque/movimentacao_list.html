@@ -1,0 +1,32 @@
+{% extends 'estoque/base.html' %}
+{% block title %}Movimentações{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Movimentações de estoque</h1>
+    <a href="{% url 'estoque:movimentacao_create' %}" class="btn btn-primary">+ Nova movimentação</a>
+</div>
+<table class="table table-striped">
+    <thead><tr><th>Produto</th><th>Tipo</th><th>Qtd.</th><th>Motivo</th><th>Usuário</th><th>Data</th></tr></thead>
+    <tbody>
+    {% for mov in movimentacoes %}
+        <tr>
+            <td><a href="{{ mov.produto.get_absolute_url }}">{{ mov.produto.nome }}</a></td>
+            <td>
+                {% if mov.tipo == 'ENTRADA' %}
+                    <span class="badge bg-success">Entrada</span>
+                {% else %}
+                    <span class="badge bg-danger">Saída</span>
+                {% endif %}
+            </td>
+            <td>{{ mov.quantidade }}</td>
+            <td>{{ mov.motivo|default:'-' }}</td>
+            <td>{{ mov.usuario|default:'-' }}</td>
+            <td>{{ mov.data }}</td>
+        </tr>
+    {% empty %}
+        <tr><td colspan="6" class="text-muted">Nenhuma movimentação registrada.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% include 'estoque/_paginacao.html' %}
+{% endblock %}

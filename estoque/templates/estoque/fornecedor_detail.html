@@ -1,0 +1,19 @@
+{% extends 'estoque/base.html' %}
+{% block title %}{{ fornecedor.nome }}{% endblock %}
+{% block content %}
+<h1 class="mb-4">{{ fornecedor.nome }}</h1>
+<table class="table table-sm">
+    <tr><th>CNPJ/CPF</th><td>{{ fornecedor.cnpj_cpf|default:'-' }}</td></tr>
+    <tr><th>Telefone</th><td>{{ fornecedor.telefone|default:'-' }}</td></tr>
+    <tr><th>E-mail</th><td>{{ fornecedor.email|default:'-' }}</td></tr>
+    <tr><th>Endereço</th><td>{{ fornecedor.endereco|default:'-' }}</td></tr>
+</table>
+<h5>Produtos fornecidos</h5>
+<ul class="list-group">
+{% for produto in fornecedor.produtos.all %}
+    <li class="list-group-item"><a href="{{ produto.get_absolute_url }}">{{ produto.nome }}</a></li>
+{% empty %}
+    <li class="list-group-item text-muted">Nenhum produto vinculado.</li>
+{% endfor %}
+</ul>
+{% endblock %}

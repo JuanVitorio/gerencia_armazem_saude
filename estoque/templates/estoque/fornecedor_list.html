@@ -1,0 +1,28 @@
+{% extends 'estoque/base.html' %}
+{% block title %}Fornecedores{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Fornecedores</h1>
+    <a href="{% url 'estoque:fornecedor_create' %}" class="btn btn-primary">+ Novo fornecedor</a>
+</div>
+<table class="table table-striped">
+    <thead><tr><th>Nome</th><th>CNPJ/CPF</th><th>Telefone</th><th>Ativo</th><th></th></tr></thead>
+    <tbody>
+    {% for fornecedor in fornecedores %}
+        <tr>
+            <td><a href="{{ fornecedor.get_absolute_url }}">{{ fornecedor.nome }}</a></td>
+            <td>{{ fornecedor.cnpj_cpf|default:'-' }}</td>
+            <td>{{ fornecedor.telefone|default:'-' }}</td>
+            <td>{% if fornecedor.ativo %}Sim{% else %}Não{% endif %}</td>
+            <td class="text-end">
+                <a href="{% url 'estoque:fornecedor_update' fornecedor.pk %}" class="btn btn-sm btn-outline-secondary">Editar</a>
+                <a href="{% url 'estoque:fornecedor_delete' fornecedor.pk %}" class="btn btn-sm btn-outline-danger">Excluir</a>
+            </td>
+        </tr>
+    {% empty %}
+        <tr><td colspan="5" class="text-muted">Nenhum fornecedor cadastrado.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% include 'estoque/_paginacao.html' %}
+{% endblock %}

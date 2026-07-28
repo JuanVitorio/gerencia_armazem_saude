@@ -1,0 +1,47 @@
+{% extends 'estoque/base.html' %}
+{% block title %}{{ produto.nome }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>{{ produto.nome }}</h1>
+    <div>
+        <a href="{% url 'estoque:movimentacao_create' %}?produto={{ produto.pk }}" class="btn btn-success">Registrar movimentação</a>
+        <a href="{% url 'estoque:produto_update' produto.pk %}" class="btn btn-outline-secondary">Editar</a>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <table class="table table-sm">
+            <tr><th>SKU</th><td>{{ produto.sku }}</td></tr>
+            <tr><th>Código de barras</th><td>{{ produto.codigo_barras|default:'-' }}</td></tr>
+            <tr><th>Categoria</th><td>{{ produto.categoria|default:'-' }}</td></tr>
+            <tr><th>Fornecedor</th><td>{{ produto.fornecedor|default:'-' }}</td></tr>
+            <tr><th>Quantidade em estoque</th>
+                <td class="{% if produto.estoque_baixo %}text-danger fw-bold{% endif %}">{{ produto.quantidade }}</td></tr>
+            <tr><th>Estoque mínimo</th><td>{{ produto.quantidade_minima }}</td></tr>
+            <tr><th>Preço de custo</th><td>R$ {{ produto.preco_custo }}</td></tr>
+            <tr><th>Preço de venda</th><td>R$ {{ produto.preco_venda }}</td></tr>
+            <tr><th>Valor total em estoque</th><td>R$ {{ produto.valor_total_estoque }}</td></tr>
+        </table>
+        {% if produto.descricao %}<p>{{ produto.descricao }}</p>{% endif %}
+    </div>
+</div>
+
+<h5>Últimas movimentações</h5>
+<table class="table table-sm table-striped">
+    <thead><tr><th>Tipo</th><th>Qtd.</th><th>Motivo</th><th>Usuário</th><th>Data</th></tr></thead>
+    <tbody>
+    {% for mov in movimentacoes %}
+        <tr>
+            <td>{{ mov.get_tipo_display }}</td>
+            <td>{{ mov.quantidade }}</td>
+            <td>{{ mov.motivo|default:'-' }}</td>
+            <td>{{ mov.usuario|default:'-' }}</td>
+            <td>{{ mov.data }}</td>
+        </tr>
+    {% empty %}
+        <tr><td colspan="5" class="text-muted">Nenhuma movimentação registrada.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

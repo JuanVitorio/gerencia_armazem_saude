@@ -1,0 +1,18 @@
+{% extends 'estoque/base.html' %}
+{% block title %}Nova movimentação{% endblock %}
+{% block content %}
+<h1 class="mb-4">Registrar movimentação de estoque</h1>
+<form method="post" novalidate>
+    {% csrf_token %}
+    {% for field in form %}
+        <div class="mb-3">
+            {{ field.label_tag }}
+            {{ field }}
+            {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+    {% endfor %}
+    {% for error in form.non_field_errors %}<div class="alert alert-danger">{{ error }}</div>{% endfor %}
+    <button type="submit" class="btn btn-primary">Registrar</button>
+    <a href="{% url 'estoque:movimentacao_list' %}" class="btn btn-outline-secondary">Cancelar</a>
+</form>
+{% endblock %}

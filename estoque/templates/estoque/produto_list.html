@@ -1,0 +1,49 @@
+{% extends 'estoque/base.html' %}
+{% block title %}Produtos{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Produtos</h1>
+    <a href="{% url 'estoque:produto_create' %}" class="btn btn-primary">+ Novo produto</a>
+</div>
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-md-4">{{ filtro_form.q }}</div>
+    <div class="col-md-3">{{ filtro_form.categoria }}</div>
+    <div class="col-md-3 d-flex align-items-center">
+        <div class="form-check">
+            {{ filtro_form.apenas_estoque_baixo }}
+            <label class="form-check-label" for="id_apenas_estoque_baixo">Apenas estoque baixo</label>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <button type="submit" class="btn btn-outline-secondary w-100">Filtrar</button>
+    </div>
+</form>
+
+<table class="table table-striped align-middle">
+    <thead>
+        <tr>
+            <th>Nome</th><th>SKU</th><th>Categoria</th><th>Qtd.</th><th>Preço venda</th><th></th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for produto in produtos %}
+        <tr class="{% if produto.estoque_baixo %}table-danger{% endif %}">
+            <td><a href="{{ produto.get_absolute_url }}">{{ produto.nome }}</a></td>
+            <td>{{ produto.sku }}</td>
+            <td>{{ produto.categoria|default:'-' }}</td>
+            <td>{{ produto.quantidade }}</td>
+            <td>R$ {{ produto.preco_venda }}</td>
+            <td class="text-end">
+                <a href="{% url 'estoque:produto_update' produto.pk %}" class="btn btn-sm btn-outline-secondary">Editar</a>
+                <a href="{% url 'estoque:produto_delete' produto.pk %}" class="btn btn-sm btn-outline-danger">Excluir</a>
+            </td>
+        </tr>
+    {% empty %}
+        <tr><td colspan="6" class="text-muted">Nenhum produto cadastrado.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+{% include 'estoque/_paginacao.html' %}
+{% endblock %}

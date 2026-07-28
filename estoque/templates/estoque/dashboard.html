@@ -1,0 +1,86 @@
+{% extends 'estoque/base.html' %}
+{% load humanize %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h1 class="mb-4">Dashboard</h1>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card text-center shadow-sm">
+            <div class="card-body">
+                <h6 class="text-muted">Produtos ativos</h6>
+                <h2>{{ total_produtos }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center shadow-sm">
+            <div class="card-body">
+                <h6 class="text-muted">Itens em estoque</h6>
+                <h2>{{ total_itens }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center shadow-sm">
+            <div class="card-body">
+                <h6 class="text-muted">Valor total (custo)</h6>
+                <h2>R$ {{ valor_total_estoque|floatformat:2|intcomma }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center shadow-sm border-danger">
+            <div class="card-body">
+                <h6 class="text-muted">Estoque baixo</h6>
+                <h2 class="text-danger">{{ produtos_estoque_baixo|length }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-6">
+        <h5>⚠️ Produtos com estoque baixo</h5>
+        <table class="table table-sm table-striped">
+            <thead><tr><th>Produto</th><th>Qtd.</th><th>Mínimo</th></tr></thead>
+            <tbody>
+            {% for produto in produtos_estoque_baixo %}
+                <tr>
+                    <td><a href="{{ produto.get_absolute_url }}">{{ produto.nome }}</a></td>
+                    <td>{{ produto.quantidade }}</td>
+                    <td>{{ produto.quantidade_minima }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="3" class="text-muted">Nenhum produto com estoque baixo 🎉</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="col-md-6">
+        <h5>🔄 Últimas movimentações</h5>
+        <table class="table table-sm table-striped">
+            <thead><tr><th>Produto</th><th>Tipo</th><th>Qtd.</th><th>Data</th></tr></thead>
+            <tbody>
+            {% for mov in ultimas_movimentacoes %}
+                <tr>
+                    <td>{{ mov.produto.nome }}</td>
+                    <td>
+                        {% if mov.tipo == 'ENTRADA' %}
+                            <span class="badge bg-success">Entrada</span>
+                        {% else %}
+                            <span class="badge bg-danger">Saída</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ mov.quantidade }}</td>
+                    <td>{{ mov.data|naturaltime }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="4" class="text-muted">Nenhuma movimentação ainda.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

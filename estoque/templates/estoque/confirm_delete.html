@@ -1,0 +1,11 @@
+{% extends 'estoque/base.html' %}
+{% block title %}Confirmar exclusão{% endblock %}
+{% block content %}
+<h1 class="mb-4">Confirmar exclusão</h1>
+<p>Tem certeza que deseja excluir <strong>{{ object }}</strong>? Esta ação não pode ser desfeita.</p>
+<form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">Sim, excluir</button>
+    <a href="{{ view.success_url }}" class="btn btn-outline-secondary">Cancelar</a>
+</form>
+{% endblock %}

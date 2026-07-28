@@ -1,0 +1,17 @@
+{% extends 'estoque/base.html' %}
+{% block title %}{% if object %}Editar{% else %}Novo{% endif %} fornecedor{% endblock %}
+{% block content %}
+<h1 class="mb-4">{% if object %}Editar{% else %}Novo{% endif %} fornecedor</h1>
+<form method="post" novalidate>
+    {% csrf_token %}
+    {% for field in form %}
+        <div class="mb-3">
+            {{ field.label_tag }}
+            {{ field }}
+            {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+    {% endfor %}
+    <button type="submit" class="btn btn-primary">Salvar</button>
+    <a href="{% url 'estoque:fornecedor_list' %}" class="btn btn-outline-secondary">Cancelar</a>
+</form>
+{% endblock %}
