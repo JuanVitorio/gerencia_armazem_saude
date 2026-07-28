@@ -85,3 +85,14 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'estoque:dashboard'
 LOGOUT_REDIRECT_URL = 'login'
+
+# Regras de negócio do estoque
+# Como o campo "estoque mínimo" por produto foi removido do cadastro (para
+# simplificar o dia a dia dos postos/secretarias), o sistema usa um limite
+# único e global para sinalizar "estoque baixo". Ajuste esse número conforme
+# a realidade da sua secretaria.
+LIMITE_ESTOQUE_BAIXO = 10
+
+# Quantos dias antes do vencimento um produto passa a ser sinalizado como
+# "próximo do vencimento" no dashboard e nos relatórios.
+DIAS_ALERTA_VENCIMENTO = 60
