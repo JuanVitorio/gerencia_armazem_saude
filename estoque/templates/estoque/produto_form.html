@@ -1,32 +1,70 @@
 {% extends 'estoque/base.html' %}
-{% block title %}{% if object %}Editar{% else %}Novo{% endif %} produto{% endblock %}
+{% block title %}{% if object %}Editar{% else %}Novo{% endif %} Produto — Gestão de Estoque{% endblock %}
+
 {% block content %}
-<h1 class="mb-4">{% if object %}Editar{% else %}Novo{% endif %} produto</h1>
-<p class="text-muted small">
-    Campos marcados com <span class="text-danger">*</span> são obrigatórios.
-    Alguns campos aparecem ou somem automaticamente conforme a categoria escolhida.
-</p>
-<form method="post" novalidate>
-    {% csrf_token %}
-    {% for field in form %}
-        <div class="mb-3" id="campo-{{ field.name }}">
-            {{ field.label_tag }}
-            {{ field }}
-            {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
-            {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <!-- Cabeçalho -->
+        <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+            <div>
+                <h1 class="h2 mb-1 d-flex align-items-center gap-2">
+                    <i class="bi bi-box-seam-fill text-primary"></i>
+                    {% if object %}Editar{% else %}Novo{% endif %} Produto
+                </h1>
+                <p class="text-muted fs-5 mb-0">Preencha os campos abaixo. Itens com <span class="text-danger fw-bold">*</span> são obrigatórios.</p>
+            </div>
+            <a href="{% url 'estoque:produto_list' %}" class="btn btn-outline-secondary btn-lg">
+                <i class="bi bi-arrow-left"></i> Voltar à Lista
+            </a>
         </div>
-    {% endfor %}
-    {% for error in form.non_field_errors %}<div class="alert alert-danger">{{ error }}</div>{% endfor %}
-    <button type="submit" class="btn btn-primary">Salvar</button>
-    <a href="{% url 'estoque:produto_list' %}" class="btn btn-outline-secondary">Cancelar</a>
-</form>
+
+        <div class="card-custom shadow-sm mb-5">
+            <div class="card-custom-body bg-white p-4">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+
+                    {% for error in form.non_field_errors %}
+                        <div class="alert alert-danger mb-4 shadow-sm">
+                            <i class="bi bi-exclamation-octagon-fill me-2"></i> {{ error }}
+                        </div>
+                    {% endfor %}
+
+                    <div class="row g-3">
+                        {% for field in form %}
+                            <div class="col-md-6 mb-2" id="campo-{{ field.name }}">
+                                <label for="{{ field.id_for_label }}" class="form-label fs-5 fw-bold text-dark">
+                                    {{ field.label }}
+                                </label>
+                                {{ field }}
+                                {% if field.help_text %}
+                                    <div class="form-text fs-6"><i class="bi bi-info-circle text-muted me-1"></i> {{ field.help_text }}</div>
+                                {% endif %}
+                                {% for error in field.errors %}
+                                    <div class="text-danger fw-bold mt-1 fs-6"><i class="bi bi-x-circle-fill me-1"></i> {{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="d-flex gap-3 mt-4 pt-3 border-top">
+                        <button type="submit" class="btn btn-primary btn-lg px-4 shadow-sm fw-bold">
+                            <i class="bi bi-check-circle-fill"></i> Salvar Produto
+                        </button>
+                        <a href="{% url 'estoque:produto_list' %}" class="btn btn-outline-secondary btn-lg px-4 fw-bold">
+                            Cancelar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
 (function () {
     // Campos que aparecem/somem dependendo do tipo da categoria escolhida.
-    // Ajuste estas listas se a realidade da sua secretaria for diferente.
     var CAMPOS_CONDICIONAIS = ['sku', 'codigo_barras', 'fornecedor', 'lote', 'data_validade'];
     var CAMPOS_POR_TIPO = {
         ALIMENTO: ['fornecedor', 'data_validade'],

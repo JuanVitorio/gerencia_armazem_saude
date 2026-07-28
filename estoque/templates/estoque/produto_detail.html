@@ -1,58 +1,162 @@
 {% extends 'estoque/base.html' %}
-{% block title %}{{ produto.nome }}{% endblock %}
+{% block title %}{{ produto.nome }} — Detalhes do Produto{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h1>
-        {{ produto.nome }}
-        {% if produto.vencido %}
-            <span class="badge bg-danger align-middle">Vencido</span>
-        {% elif produto.venc_proximo %}
-            <span class="badge bg-warning text-dark align-middle">Próximo do vencimento</span>
-        {% endif %}
-        {% if produto.estoque_baixo %}
-            <span class="badge bg-danger align-middle">Estoque baixo</span>
-        {% endif %}
-    </h1>
+<!-- Cabeçalho -->
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4 pb-3 border-bottom">
     <div>
-        <a href="{% url 'estoque:movimentacao_create' %}?produto={{ produto.pk }}" class="btn btn-success">Registrar movimentação</a>
-        <a href="{% url 'estoque:produto_update' produto.pk %}" class="btn btn-outline-secondary">Editar</a>
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+            <h1 class="h2 mb-0">{{ produto.nome }}</h1>
+            {% if produto.vencido %}
+                <span class="badge badge-danger-custom fs-6"><i class="bi bi-x-octagon-fill"></i> Vencido</span>
+            {% elif produto.venc_proximo %}
+                <span class="badge badge-warning-custom fs-6"><i class="bi bi-clock-history"></i> Próximo do vencimento</span>
+            {% endif %}
+            {% if produto.estoque_baixo %}
+                <span class="badge badge-danger-custom fs-6"><i class="bi bi-exclamation-triangle-fill"></i> Estoque baixo</span>
+            {% endif %}
+        </div>
+        <p class="text-muted fs-5 mb-0">Informações detalhadas e histórico de movimentações deste item.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a href="{% url 'estoque:movimentacao_create' %}?produto={{ produto.pk }}" class="btn btn-success btn-lg shadow-sm">
+            <i class="bi bi-arrow-down-up"></i> Registrar Movimentação
+        </a>
+        <a href="{% url 'estoque:produto_update' produto.pk %}" class="btn btn-outline-secondary btn-lg">
+            <i class="bi bi-pencil-square"></i> Editar Produto
+        </a>
     </div>
 </div>
 
-<div class="row mb-4">
-    <div class="col-md-6">
-        <table class="table table-sm">
-            <tr><th>Código</th><td>{{ produto.sku|default:'-' }}</td></tr>
-            <tr><th>Código de barras</th><td>{{ produto.codigo_barras|default:'-' }}</td></tr>
-            <tr><th>Lote</th><td>{{ produto.lote|default:'-' }}</td></tr>
-            <tr><th>Categoria</th><td>{{ produto.categoria|default:'-' }}</td></tr>
-            <tr><th>Fornecedor</th><td>{{ produto.fornecedor|default:'-' }}</td></tr>
-            <tr><th>Unidade de medida</th><td>{{ produto.get_unidade_medida_display }}</td></tr>
-            <tr><th>Quantidade em estoque</th>
-                <td class="{% if produto.estoque_baixo %}text-danger fw-bold{% endif %}">{{ produto.quantidade }}</td></tr>
-            <tr><th>Data de validade</th><td>{{ produto.data_validade|date:'d/m/Y'|default:'-' }}</td></tr>
-            <tr><th>Preço de custo</th><td>R$ {{ produto.preco_custo }}</td></tr>
-            <tr><th>Valor total em estoque</th><td>R$ {{ produto.valor_total_estoque }}</td></tr>
-        </table>
-        {% if produto.descricao %}<p>{{ produto.descricao }}</p>{% endif %}
+<!-- Destaques Numéricos (Scale Booster) -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3 col-6">
+        <div class="card-custom p-3 text-center bg-white shadow-sm">
+            <div class="text-muted fs-6 fw-bold">Quantidade em Estoque</div>
+            <div class="stat-number mt-1 {% if produto.estoque_baixo %}text-danger{% else %}text-primary{% endif %}">
+                {{ produto.quantidade }} <span class="fs-6 text-muted">{{ produto.get_unidade_medida_display }}</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="card-custom p-3 text-center bg-white shadow-sm">
+            <div class="text-muted fs-6 fw-bold">Valor Total em Estoque</div>
+            <div class="stat-number mt-1 text-success">
+                R$ {{ produto.valor_total_estoque }}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="card-custom p-3 text-center bg-white shadow-sm">
+            <div class="text-muted fs-6 fw-bold">Data de Validade</div>
+            <div class="stat-number mt-1 fs-3 text-dark">
+                {% if produto.data_validade %}{{ produto.data_validade|date:'d/m/Y' }}{% else %}<span class="text-muted fs-5">Sem validade</span>{% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="card-custom p-3 text-center bg-white shadow-sm">
+            <div class="text-muted fs-6 fw-bold">Preço de Custo Unitário</div>
+            <div class="stat-number mt-1 fs-3 text-dark">
+                R$ {{ produto.preco_custo }}
+            </div>
+        </div>
     </div>
 </div>
 
-<h5>Últimas movimentações</h5>
-<table class="table table-sm table-striped">
-    <thead><tr><th>Tipo</th><th>Qtd.</th><th>Motivo</th><th>Usuário</th><th>Data</th></tr></thead>
-    <tbody>
-    {% for mov in movimentacoes %}
-        <tr>
-            <td>{{ mov.get_tipo_display }}</td>
-            <td>{{ mov.quantidade }}</td>
-            <td>{{ mov.motivo|default:'-' }}</td>
-            <td>{{ mov.usuario|default:'-' }}</td>
-            <td>{{ mov.data }}</td>
-        </tr>
-    {% empty %}
-        <tr><td colspan="5" class="text-muted">Nenhuma movimentação registrada.</td></tr>
-    {% endfor %}
-    </tbody>
-</table>
+<!-- Tabela de Detalhes -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-12">
+        <div class="card-custom shadow-sm">
+            <div class="card-custom-header">
+                <h5 class="mb-0 fs-4"><i class="bi bi-info-circle-fill text-primary me-2"></i> Ficha do Produto</h5>
+            </div>
+            <div class="card-custom-body">
+                <div class="row g-3 fs-5">
+                    <div class="col-md-4">
+                        <div class="text-muted fs-6 fw-bold">Código SKU</div>
+                        <div class="fw-bold text-dark">{{ produto.sku|default:'-' }}</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-muted fs-6 fw-bold">Código de Barras</div>
+                        <div class="fw-bold text-dark">{{ produto.codigo_barras|default:'-' }}</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-muted fs-6 fw-bold">Lote</div>
+                        <div class="fw-bold text-dark">{{ produto.lote|default:'-' }}</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-muted fs-6 fw-bold">Categoria</div>
+                        <div class="fw-bold text-dark">{{ produto.categoria|default:'-' }}</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-muted fs-6 fw-bold">Fornecedor</div>
+                        <div class="fw-bold text-dark">{{ produto.fornecedor|default:'-' }}</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-muted fs-6 fw-bold">Unidade de Medida</div>
+                        <div class="fw-bold text-dark">{{ produto.get_unidade_medida_display }}</div>
+                    </div>
+                    {% if produto.descricao %}
+                    <div class="col-12 border-top pt-3 mt-3">
+                        <div class="text-muted fs-6 fw-bold">Descrição / Observações</div>
+                        <p class="mb-0 text-dark">{{ produto.descricao }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Últimas Movimentações deste Produto -->
+<div class="card-custom shadow-sm mb-4">
+    <div class="card-custom-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0 fs-4"><i class="bi bi-clock-history text-primary me-2"></i> Histórico de Movimentações</h5>
+        <a href="{% url 'estoque:movimentacao_create' %}?produto={{ produto.pk }}" class="btn btn-sm btn-success fw-bold">
+            <i class="bi bi-plus-lg"></i> Nova Entrada/Saída
+        </a>
+    </div>
+    <div class="card-custom-body p-0">
+        <div class="table-responsive">
+            <table class="table table-custom align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Tipo</th>
+                        <th>Quantidade</th>
+                        <th>Motivo / Observação</th>
+                        <th>Usuário</th>
+                        <th class="text-end">Data e Hora</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for mov in movimentacoes %}
+                    <tr>
+                        <td>
+                            {% if mov.tipo == 'ENTRADA' %}
+                                <span class="badge badge-success-custom fs-6"><i class="bi bi-arrow-down-left-circle-fill"></i> Entrada</span>
+                            {% else %}
+                                <span class="badge badge-danger-custom fs-6"><i class="bi bi-arrow-up-right-circle-fill"></i> Saída</span>
+                            {% endif %}
+                        </td>
+                        <td class="fw-bold fs-5 text-dark">{{ mov.quantidade }} un.</td>
+                        <td class="text-muted fs-6">{{ mov.motivo|default:'-' }}</td>
+                        <td class="fw-semibold text-dark fs-6"><i class="bi bi-person me-1"></i> {{ mov.usuario|default:'-' }}</td>
+                        <td class="text-end text-muted fs-6"><i class="bi bi-clock me-1"></i> {{ mov.data }}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="5">
+                            <div class="empty-state">
+                                <i class="bi bi-clock"></i>
+                                <p class="fs-5 text-muted fw-bold">Nenhuma movimentação registrada para este produto.</p>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 {% endblock %}

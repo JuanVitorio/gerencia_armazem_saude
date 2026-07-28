@@ -1,67 +1,148 @@
 {% extends 'estoque/base.html' %}
-{% block title %}Produtos{% endblock %}
+{% block title %}Produtos — Gestão de Estoque{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h1>Produtos</h1>
-    <a href="{% url 'estoque:produto_create' %}" class="btn btn-primary">+ Novo produto</a>
+<!-- Cabeçalho -->
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4 pb-3 border-bottom">
+    <div>
+        <h1 class="h2 mb-1 d-flex align-items-center gap-2">
+            <i class="bi bi-box-seam text-primary"></i>
+            Produtos Cadastrados
+        </h1>
+        <p class="text-muted fs-5 mb-0">Consulte, altere ou adicione rapidamente novos itens ao armazém.</p>
+    </div>
+    <a href="{% url 'estoque:produto_create' %}" class="btn btn-primary btn-lg shadow-sm">
+        <i class="bi bi-plus-circle-fill"></i> Cadastrar Novo Produto
+    </a>
 </div>
 
-<form method="get" class="row g-2 mb-3">
-    <div class="col-md-5">{{ filtro_form.q }}</div>
-    <div class="col-md-3">{{ filtro_form.categoria }}</div>
-    <div class="col-md-2">{{ filtro_form.situacao }}</div>
-    <div class="col-md-2">
-        <button type="submit" class="btn btn-outline-secondary w-100">Filtrar</button>
+<!-- Filtros de Busca -->
+<div class="card-custom shadow-sm mb-4">
+    <div class="card-custom-body bg-white">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">
+                    <i class="bi bi-search text-primary me-1"></i> Buscar por Nome / Código
+                </label>
+                {{ filtro_form.q }}
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">
+                    <i class="bi bi-tags text-primary me-1"></i> Categoria
+                </label>
+                {{ filtro_form.categoria }}
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">
+                    <i class="bi bi-funnel text-primary me-1"></i> Situação
+                </label>
+                {{ filtro_form.situacao }}
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary btn-lg w-100 fw-bold">
+                    <i class="bi bi-filter"></i> Filtrar
+                </button>
+            </div>
+        </form>
     </div>
-</form>
+</div>
 
-<table class="table table-striped align-middle">
-    <thead>
-        <tr>
-            <th>Nome</th><th>Categoria</th><th>Qtd.</th><th>Validade</th><th>Ação rápida</th><th></th>
-        </tr>
-    </thead>
-    <tbody>
-    {% for produto in produtos %}
-        <tr class="{% if produto.estoque_baixo %}table-danger{% endif %}">
-            <td>
-                <a href="{{ produto.get_absolute_url }}">{{ produto.nome }}</a>
-                {% if produto.sku %}<div class="text-muted small">{{ produto.sku }}</div>{% endif %}
-            </td>
-            <td>{{ produto.categoria|default:'-' }}</td>
-            <td>{{ produto.quantidade }} {{ produto.get_unidade_medida_display }}</td>
-            <td>
-                {% if produto.data_validade %}
-                    {% if produto.vencido %}
-                        <span class="badge bg-danger">Vencido</span>
-                    {% elif produto.venc_proximo %}
-                        <span class="badge bg-warning text-dark">Próx. {{ produto.data_validade|date:'d/m/Y' }}</span>
-                    {% else %}
-                        {{ produto.data_validade|date:'d/m/Y' }}
-                    {% endif %}
-                {% else %}
-                    <span class="text-muted">-</span>
-                {% endif %}
-            </td>
-            <td>
-                <form action="{% url 'estoque:movimentacao_rapida' produto.pk %}" method="post" class="d-flex gap-1">
-                    {% csrf_token %}
-                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                    <input type="number" name="quantidade" value="1" min="1" class="form-control form-control-sm" style="width: 4.5rem;">
-                    <button type="submit" name="tipo" value="ENTRADA" class="btn btn-sm btn-outline-success" title="Registrar entrada">+</button>
-                    <button type="submit" name="tipo" value="SAIDA" class="btn btn-sm btn-outline-danger" title="Registrar saída">−</button>
-                </form>
-            </td>
-            <td class="text-end">
-                <a href="{% url 'estoque:produto_update' produto.pk %}" class="btn btn-sm btn-outline-secondary">Editar</a>
-                <a href="{% url 'estoque:produto_delete' produto.pk %}" class="btn btn-sm btn-outline-danger">Excluir</a>
-            </td>
-        </tr>
-    {% empty %}
-        <tr><td colspan="6" class="text-muted">Nenhum produto cadastrado.</td></tr>
-    {% endfor %}
-    </tbody>
-</table>
+<!-- Tabela de Produtos -->
+<div class="card-custom shadow-sm mb-4">
+    <div class="card-custom-body p-0">
+        <div class="table-responsive">
+            <table class="table table-custom align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th style="min-width: 200px;">Produto</th>
+                        <th>Categoria</th>
+                        <th>Qtd. em Estoque</th>
+                        <th>Validade</th>
+                        <th>Ação Rápida (+/-)</th>
+                        <th class="text-end">Opções</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for produto in produtos %}
+                    <tr class="{% if produto.estoque_baixo %}row-danger-highlight{% endif %}">
+                        <td>
+                            <a href="{{ produto.get_absolute_url }}" class="fw-bold text-decoration-none text-dark fs-5">
+                                {{ produto.nome }}
+                            </a>
+                            {% if produto.sku %}
+                                <div class="text-muted fs-6"><i class="bi bi-barcode"></i> SKU: {{ produto.sku }}</div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if produto.categoria %}
+                                <span class="badge badge-secondary-custom fs-6">{{ produto.categoria }}</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="fs-5 fw-bold {% if produto.estoque_baixo %}text-danger{% else %}text-dark{% endif %}">
+                                {{ produto.quantidade }} {{ produto.get_unidade_medida_display }}
+                            </span>
+                            {% if produto.estoque_baixo %}
+                                <span class="badge badge-danger-custom ms-1 fs-6">Estoque Baixo</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if produto.data_validade %}
+                                {% if produto.vencido %}
+                                    <span class="badge badge-danger-custom fs-6"><i class="bi bi-x-circle-fill"></i> Vencido</span>
+                                {% elif produto.venc_proximo %}
+                                    <span class="badge badge-warning-custom fs-6"><i class="bi bi-clock"></i> Próx. {{ produto.data_validade|date:'d/m/Y' }}</span>
+                                {% else %}
+                                    <span class="fs-6 fw-semibold text-dark"><i class="bi bi-calendar3 me-1"></i> {{ produto.data_validade|date:'d/m/Y' }}</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-muted fs-6">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <form action="{% url 'estoque:movimentacao_rapida' produto.pk %}" method="post" class="d-flex align-items-center gap-1">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                <input type="number" name="quantidade" value="1" min="1" class="form-control form-control-sm text-center fw-bold" style="width: 4rem; font-size: 1.1rem; height: 38px;">
+                                <button type="submit" name="tipo" value="ENTRADA" class="btn btn-sm btn-success px-2 py-1 fw-bold" title="Adicionar ao Estoque (+ Entrada)" style="height: 38px;">
+                                    <i class="bi bi-plus-lg"></i>
+                                </button>
+                                <button type="submit" name="tipo" value="SAIDA" class="btn btn-sm btn-danger px-2 py-1 fw-bold" title="Retirar do Estoque (- Saída)" style="height: 38px;">
+                                    <i class="bi bi-dash-lg"></i>
+                                </button>
+                            </form>
+                        </td>
+                        <td class="text-end">
+                            <div class="btn-group">
+                                <a href="{{ produto.get_absolute_url }}" class="btn btn-sm btn-outline-primary fw-bold" title="Ver detalhes">
+                                    <i class="bi bi-eye"></i> Ver
+                                </a>
+                                <a href="{% url 'estoque:produto_update' produto.pk %}" class="btn btn-sm btn-outline-secondary fw-bold" title="Editar produto">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{% url 'estoque:produto_delete' produto.pk %}" class="btn btn-sm btn-outline-danger fw-bold" title="Excluir produto">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state">
+                                <i class="bi bi-inbox"></i>
+                                <p class="fs-5 text-muted fw-bold">Nenhum produto encontrado com os filtros atuais.</p>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 
 {% include 'estoque/_paginacao.html' %}
 {% endblock %}

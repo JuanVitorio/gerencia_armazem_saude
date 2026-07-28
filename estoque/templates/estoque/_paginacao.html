@@ -1,12 +1,34 @@
 {% if is_paginated %}
-<nav>
-    <ul class="pagination">
+<nav class="d-flex justify-content-center my-4">
+    <ul class="pagination pagination-lg mb-0 shadow-sm">
         {% if page_obj.has_previous %}
-            <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">Anterior</a></li>
+            <li class="page-item">
+                <a class="page-link fw-bold px-4" href="?page={{ page_obj.previous_page_number }}">
+                    <i class="bi bi-chevron-left me-1"></i> Anterior
+                </a>
+            </li>
+        {% else %}
+            <li class="page-item disabled">
+                <span class="page-link px-4 text-muted"><i class="bi bi-chevron-left me-1"></i> Anterior</span>
+            </li>
         {% endif %}
-        <li class="page-item disabled"><span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span></li>
+
+        <li class="page-item disabled">
+            <span class="page-link fw-bold text-dark px-4 bg-light">
+                Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+            </span>
+        </li>
+
         {% if page_obj.has_next %}
-            <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Próxima</a></li>
+            <li class="page-item">
+                <a class="page-link fw-bold px-4" href="?page={{ page_obj.next_page_number }}">
+                    Próxima <i class="bi bi-chevron-right ms-1"></i>
+                </a>
+            </li>
+        {% else %}
+            <li class="page-item disabled">
+                <span class="page-link px-4 text-muted">Próxima <i class="bi bi-chevron-right ms-1"></i></span>
+            </li>
         {% endif %}
     </ul>
 </nav>

@@ -1,14 +1,66 @@
 {% extends 'estoque/base.html' %}
-{% block title %}{{ categoria.nome }}{% endblock %}
+{% block title %}Categoria: {{ categoria.nome }} — Gestão de Estoque{% endblock %}
+
 {% block content %}
-<h1 class="mb-4">{{ categoria.nome }}</h1>
-<p>{{ categoria.descricao|default:'Sem descrição.' }}</p>
-<h5>Produtos nesta categoria</h5>
-<ul class="list-group">
-{% for produto in categoria.produtos.all %}
-    <li class="list-group-item"><a href="{{ produto.get_absolute_url }}">{{ produto.nome }}</a> — {{ produto.quantidade }} un.</li>
-{% empty %}
-    <li class="list-group-item text-muted">Nenhum produto nesta categoria.</li>
-{% endfor %}
-</ul>
+<!-- Cabeçalho -->
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4 pb-3 border-bottom">
+    <div>
+        <h1 class="h2 mb-1 d-flex align-items-center gap-2">
+            <i class="bi bi-tag-fill text-primary"></i>
+            Categoria: {{ categoria.nome }}
+        </h1>
+        <p class="text-muted fs-5 mb-0">{{ categoria.descricao|default:'Sem descrição cadastrada.' }}</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'estoque:categoria_update' categoria.pk %}" class="btn btn-outline-secondary btn-lg">
+            <i class="bi bi-pencil-square"></i> Editar Categoria
+        </a>
+        <a href="{% url 'estoque:categoria_list' %}" class="btn btn-outline-primary btn-lg">
+            <i class="bi bi-arrow-left"></i> Voltar à Lista
+        </a>
+    </div>
+</div>
+
+<div class="card-custom shadow-sm mb-4">
+    <div class="card-custom-header">
+        <h5 class="mb-0 fs-4"><i class="bi bi-box-seam text-primary me-2"></i> Produtos nesta Categoria</h5>
+    </div>
+    <div class="card-custom-body p-0">
+        <div class="table-responsive">
+            <table class="table table-custom align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Produto</th>
+                        <th class="text-end">Quantidade em Estoque</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for produto in categoria.produtos.all %}
+                    <tr>
+                        <td>
+                            <a href="{{ produto.get_absolute_url }}" class="fw-bold text-decoration-none text-dark fs-5">
+                                {{ produto.nome }}
+                            </a>
+                        </td>
+                        <td class="text-end">
+                            <span class="badge badge-success-custom fs-6">
+                                {{ produto.quantidade }} {{ produto.get_unidade_medida_display }}
+                            </span>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="2">
+                            <div class="empty-state">
+                                <i class="bi bi-inbox"></i>
+                                <p class="fs-5 text-muted fw-bold">Nenhum produto vinculado a esta categoria ainda.</p>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 {% endblock %}

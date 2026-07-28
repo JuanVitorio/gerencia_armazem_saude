@@ -1,126 +1,184 @@
 {% extends 'estoque/base.html' %}
-{% block title %}Relatórios{% endblock %}
+{% block title %}Relatórios — Gestão de Estoque{% endblock %}
+
 {% block content %}
-<h1 class="mb-1">Relatórios</h1>
-<p class="text-muted mb-4">Gere relatórios em PDF, prontos para imprimir ou compartilhar.</p>
+<!-- Cabeçalho -->
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4 pb-3 border-bottom">
+    <div>
+        <h1 class="h2 mb-1 d-flex align-items-center gap-2">
+            <i class="bi bi-file-earmark-bar-graph text-primary"></i>
+            Relatórios e Documentos
+        </h1>
+        <p class="text-muted fs-5 mb-0">Gere documentos em PDF prontos para impressão ou prestação de contas.</p>
+    </div>
+</div>
 
-<div class="row g-3">
-
+<div class="row g-4">
+    <!-- Relatório 1: Estoque Atual -->
     <div class="col-md-6 col-lg-4">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body d-flex flex-column">
-                <h5 class="card-title">📋 Estoque atual</h5>
-                <p class="card-text text-muted small flex-grow-1">Lista completa de produtos ativos, quantidades e valor total em estoque.</p>
-                <a href="{% url 'estoque:relatorio_gerar' tipo='estoque_atual' %}" target="_blank" class="btn btn-primary mt-auto">Gerar PDF</a>
+        <div class="card-custom h-100 shadow-sm">
+            <div class="card-custom-header bg-primary bg-opacity-10">
+                <h5 class="card-title mb-0 fs-4 text-primary-emphasis d-flex align-items-center gap-2">
+                    <i class="bi bi-box-seam-fill text-primary"></i> Estoque Atual
+                </h5>
+            </div>
+            <div class="card-custom-body d-flex flex-column">
+                <p class="text-muted fs-6 flex-grow-1">Lista completa de todos os produtos ativos, quantidades atuais e o valor total acumulado no estoque.</p>
+                <a href="{% url 'estoque:relatorio_gerar' tipo='estoque_atual' %}" target="_blank" class="btn btn-primary btn-lg mt-auto fw-bold w-100">
+                    <i class="bi bi-file-earmark-pdf-fill"></i> Gerar PDF
+                </a>
             </div>
         </div>
     </div>
 
+    <!-- Relatório 2: Estoque Baixo -->
     <div class="col-md-6 col-lg-4">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body d-flex flex-column">
-                <h5 class="card-title">⚠️ Estoque baixo</h5>
-                <p class="card-text text-muted small flex-grow-1">Produtos com quantidade igual ou menor que {{ dias_alerta_vencimento }} — limite de estoque baixo do sistema.</p>
-                <a href="{% url 'estoque:relatorio_gerar' tipo='estoque_baixo' %}" target="_blank" class="btn btn-primary mt-auto">Gerar PDF</a>
+        <div class="card-custom h-100 shadow-sm">
+            <div class="card-custom-header bg-danger bg-opacity-10">
+                <h5 class="card-title mb-0 fs-4 text-danger-emphasis d-flex align-items-center gap-2">
+                    <i class="bi bi-exclamation-triangle-fill text-danger"></i> Estoque Baixo
+                </h5>
+            </div>
+            <div class="card-custom-body d-flex flex-column">
+                <p class="text-muted fs-6 flex-grow-1">Produtos que atingiram o limite mínimo do sistema (quantidade menor ou igual a {{ dias_alerta_vencimento }} unidades).</p>
+                <a href="{% url 'estoque:relatorio_gerar' tipo='estoque_baixo' %}" target="_blank" class="btn btn-danger btn-lg mt-auto fw-bold w-100">
+                    <i class="bi bi-file-earmark-pdf-fill"></i> Gerar PDF
+                </a>
             </div>
         </div>
     </div>
 
+    <!-- Relatório 3: Vencidos / Próximos do Vencimento -->
     <div class="col-md-6 col-lg-4">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body d-flex flex-column">
-                <h5 class="card-title">⏰ Vencidos / próximos do vencimento</h5>
-                <p class="card-text text-muted small flex-grow-1">Produtos já vencidos ou que vencem dentro do prazo escolhido.</p>
+        <div class="card-custom h-100 shadow-sm">
+            <div class="card-custom-header bg-warning bg-opacity-10">
+                <h5 class="card-title mb-0 fs-4 text-warning-emphasis d-flex align-items-center gap-2">
+                    <i class="bi bi-calendar-x-fill text-warning"></i> Validade dos Produtos
+                </h5>
+            </div>
+            <div class="card-custom-body d-flex flex-column">
+                <p class="text-muted fs-6 flex-grow-1">Lista de itens vencidos ou com vencimento previsto para os próximos dias.</p>
                 <form action="{% url 'estoque:relatorio_gerar' tipo='validade' %}" method="get" target="_blank" class="mt-auto">
-                    <div class="input-group">
-                        <input type="number" name="dias" value="{{ dias_alerta_vencimento }}" min="1" class="form-control" aria-label="Dias">
-                        <button type="submit" class="btn btn-primary">Gerar PDF</button>
+                    <label class="form-label fs-6 fw-bold text-dark">Dias de antecedência:</label>
+                    <div class="input-group mb-2">
+                        <input type="number" name="dias" value="{{ dias_alerta_vencimento }}" min="1" class="form-control form-control-lg fw-bold" aria-label="Dias">
+                        <button type="submit" class="btn btn-warning btn-lg fw-bold text-dark">
+                            <i class="bi bi-file-earmark-pdf-fill"></i> Gerar PDF
+                        </button>
                     </div>
-                    <div class="form-text">Dias a considerar (padrão: {{ dias_alerta_vencimento }})</div>
                 </form>
             </div>
         </div>
     </div>
 
+    <!-- Relatório 4: Movimentações do Período -->
     <div class="col-md-6 col-lg-4">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body d-flex flex-column">
-                <h5 class="card-title">🔄 Movimentações do período</h5>
-                <p class="card-text text-muted small flex-grow-1">Todas as entradas e saídas registradas no período.</p>
+        <div class="card-custom h-100 shadow-sm">
+            <div class="card-custom-header bg-info bg-opacity-10">
+                <h5 class="card-title mb-0 fs-4 text-info-emphasis d-flex align-items-center gap-2">
+                    <i class="bi bi-arrow-left-right text-info"></i> Movimentações
+                </h5>
+            </div>
+            <div class="card-custom-body d-flex flex-column">
+                <p class="text-muted fs-6 flex-grow-1">Resumo completo de todas as entradas e saídas ocorridas no período selecionado.</p>
                 <form action="{% url 'estoque:relatorio_gerar' tipo='movimentacoes' %}" method="get" target="_blank" class="mt-auto">
-                    <div class="row g-2">
-                        <div class="col-6">
-                            <label class="form-label small">De</label>
-                            <input type="date" name="data_inicio" value="{{ inicio_mes }}" class="form-control form-control-sm">
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label small">Até</label>
-                            <input type="date" name="data_fim" value="{{ hoje }}" class="form-control form-control-sm">
-                        </div>
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100 mt-2">Gerar PDF</button>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-6 col-lg-4">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body d-flex flex-column">
-                <h5 class="card-title">📥📤 Entradas e saídas</h5>
-                <p class="card-text text-muted small flex-grow-1">Relatórios separados de entradas ou saídas no período.</p>
-                <form class="mt-auto" onsubmit="return false;">
                     <div class="row g-2 mb-2">
                         <div class="col-6">
-                            <label class="form-label small">De</label>
-                            <input type="date" id="es_inicio" value="{{ inicio_mes }}" class="form-control form-control-sm">
+                            <label class="form-label fs-6 fw-bold">De:</label>
+                            <input type="date" name="data_inicio" value="{{ inicio_mes }}" class="form-control form-control-lg">
                         </div>
                         <div class="col-6">
-                            <label class="form-label small">Até</label>
-                            <input type="date" id="es_fim" value="{{ hoje }}" class="form-control form-control-sm">
+                            <label class="form-label fs-6 fw-bold">Até:</label>
+                            <input type="date" name="data_fim" value="{{ hoje }}" class="form-control form-control-lg">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-info btn-lg w-100 fw-bold text-white mt-2">
+                        <i class="bi bi-file-earmark-pdf-fill"></i> Gerar PDF
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Relatório 5: Entradas e Saídas Separadas -->
+    <div class="col-md-6 col-lg-4">
+        <div class="card-custom h-100 shadow-sm">
+            <div class="card-custom-header bg-success bg-opacity-10">
+                <h5 class="card-title mb-0 fs-4 text-success-emphasis d-flex align-items-center gap-2">
+                    <i class="bi bi-arrow-down-up text-success"></i> Entradas & Saídas
+                </h5>
+            </div>
+            <div class="card-custom-body d-flex flex-column">
+                <p class="text-muted fs-6 flex-grow-1">Gere o relatório focado especificamente em Entradas (compras) ou Saídas (distribuição).</p>
+                <form class="mt-auto" onsubmit="return false;">
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fs-6 fw-bold">De:</label>
+                            <input type="date" id="es_inicio" value="{{ inicio_mes }}" class="form-control form-control-lg">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fs-6 fw-bold">Até:</label>
+                            <input type="date" id="es_fim" value="{{ hoje }}" class="form-control form-control-lg">
                         </div>
                     </div>
                     <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-outline-success w-100" onclick="abrirRelatorioEntradasSaidas('entradas')">Entradas</button>
-                        <button type="button" class="btn btn-outline-danger w-100" onclick="abrirRelatorioEntradasSaidas('saidas')">Saídas</button>
+                        <button type="button" class="btn btn-success btn-lg w-100 fw-bold" onclick="abrirRelatorioEntradasSaidas('entradas')">
+                            <i class="bi bi-arrow-down-left-circle"></i> Entradas
+                        </button>
+                        <button type="button" class="btn btn-danger btn-lg w-100 fw-bold" onclick="abrirRelatorioEntradasSaidas('saidas')">
+                            <i class="bi bi-arrow-up-right-circle"></i> Saídas
+                        </button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 
+    <!-- Relatório 6: Gastos do Período -->
     <div class="col-md-6 col-lg-4">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body d-flex flex-column">
-                <h5 class="card-title">💰 Gastos do período</h5>
-                <p class="card-text text-muted small flex-grow-1">Valor estimado gasto com entradas de estoque (com base no preço de custo).</p>
+        <div class="card-custom h-100 shadow-sm">
+            <div class="card-custom-header bg-secondary bg-opacity-10">
+                <h5 class="card-title mb-0 fs-4 text-dark d-flex align-items-center gap-2">
+                    <i class="bi bi-currency-dollar text-success"></i> Gastos com Estoque
+                </h5>
+            </div>
+            <div class="card-custom-body d-flex flex-column">
+                <p class="text-muted fs-6 flex-grow-1">Estimativa de custos financeiros com compras e entradas de novos produtos no período.</p>
                 <form action="{% url 'estoque:relatorio_gerar' tipo='gastos' %}" method="get" target="_blank" class="mt-auto">
-                    <div class="row g-2">
+                    <div class="row g-2 mb-2">
                         <div class="col-6">
-                            <label class="form-label small">De</label>
-                            <input type="date" name="data_inicio" value="{{ inicio_mes }}" class="form-control form-control-sm">
+                            <label class="form-label fs-6 fw-bold">De:</label>
+                            <input type="date" name="data_inicio" value="{{ inicio_mes }}" class="form-control form-control-lg">
                         </div>
                         <div class="col-6">
-                            <label class="form-label small">Até</label>
-                            <input type="date" name="data_fim" value="{{ hoje }}" class="form-control form-control-sm">
+                            <label class="form-label fs-6 fw-bold">Até:</label>
+                            <input type="date" name="data_fim" value="{{ hoje }}" class="form-control form-control-lg">
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-primary w-100 mt-2">Gerar PDF</button>
+                    <button type="submit" class="btn btn-secondary btn-lg w-100 fw-bold mt-2">
+                        <i class="bi bi-file-earmark-pdf-fill"></i> Gerar PDF
+                    </button>
                 </form>
             </div>
         </div>
     </div>
 
+    <!-- Relatório 7: Estoque por Categoria -->
     <div class="col-md-6 col-lg-4">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body d-flex flex-column">
-                <h5 class="card-title">🗂️ Estoque por categoria</h5>
-                <p class="card-text text-muted small flex-grow-1">Quantidade e valor total agrupados por categoria — útil para prestação de contas.</p>
-                <a href="{% url 'estoque:relatorio_gerar' tipo='por_categoria' %}" target="_blank" class="btn btn-primary mt-auto">Gerar PDF</a>
+        <div class="card-custom h-100 shadow-sm">
+            <div class="card-custom-header bg-primary bg-opacity-10">
+                <h5 class="card-title mb-0 fs-4 text-primary-emphasis d-flex align-items-center gap-2">
+                    <i class="bi bi-tags-fill text-primary"></i> Estoque por Categoria
+                </h5>
+            </div>
+            <div class="card-custom-body d-flex flex-column">
+                <p class="text-muted fs-6 flex-grow-1">Quantidades totais e valores financeiros agrupados por categoria — ideal para auditoria.</p>
+                <a href="{% url 'estoque:relatorio_gerar' tipo='por_categoria' %}" target="_blank" class="btn btn-primary btn-lg mt-auto fw-bold w-100">
+                    <i class="bi bi-file-earmark-pdf-fill"></i> Gerar PDF
+                </a>
             </div>
         </div>
     </div>
-
 </div>
 {% endblock %}
 

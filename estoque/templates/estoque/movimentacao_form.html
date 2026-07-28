@@ -1,18 +1,62 @@
 {% extends 'estoque/base.html' %}
-{% block title %}Nova movimentação{% endblock %}
+{% block title %}Registrar Movimentação — Gestão de Estoque{% endblock %}
+
 {% block content %}
-<h1 class="mb-4">Registrar movimentação de estoque</h1>
-<form method="post" novalidate>
-    {% csrf_token %}
-    {% for field in form %}
-        <div class="mb-3">
-            {{ field.label_tag }}
-            {{ field }}
-            {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <!-- Cabeçalho -->
+        <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+            <div>
+                <h1 class="h2 mb-1 d-flex align-items-center gap-2">
+                    <i class="bi bi-arrow-down-up text-primary"></i>
+                    Registrar Movimentação
+                </h1>
+                <p class="text-muted fs-5 mb-0">Lance entrada (adicionar) ou saída (retirar) de produtos no estoque.</p>
+            </div>
+            <a href="{% url 'estoque:movimentacao_list' %}" class="btn btn-outline-secondary btn-lg">
+                <i class="bi bi-arrow-left"></i> Voltar à Lista
+            </a>
         </div>
-    {% endfor %}
-    {% for error in form.non_field_errors %}<div class="alert alert-danger">{{ error }}</div>{% endfor %}
-    <button type="submit" class="btn btn-primary">Registrar</button>
-    <a href="{% url 'estoque:movimentacao_list' %}" class="btn btn-outline-secondary">Cancelar</a>
-</form>
+
+        <div class="card-custom shadow-sm mb-5">
+            <div class="card-custom-body bg-white p-4">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+
+                    {% for error in form.non_field_errors %}
+                        <div class="alert alert-danger mb-4 shadow-sm">
+                            <i class="bi bi-exclamation-octagon-fill me-2"></i> {{ error }}
+                        </div>
+                    {% endfor %}
+
+                    <div class="row g-3">
+                        {% for field in form %}
+                            <div class="col-12 mb-2">
+                                <label for="{{ field.id_for_label }}" class="form-label fs-5 fw-bold text-dark">
+                                    {{ field.label }}
+                                </label>
+                                {{ field }}
+                                {% if field.help_text %}
+                                    <div class="form-text fs-6"><i class="bi bi-info-circle me-1 text-muted"></i> {{ field.help_text }}</div>
+                                {% endif %}
+                                {% for error in field.errors %}
+                                    <div class="text-danger fw-bold mt-1 fs-6"><i class="bi bi-x-circle-fill me-1"></i> {{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="d-flex gap-3 mt-4 pt-3 border-top">
+                        <button type="submit" class="btn btn-success btn-lg px-4 shadow-sm fw-bold">
+                            <i class="bi bi-check-circle-fill"></i> Confirmar e Registrar
+                        </button>
+                        <a href="{% url 'estoque:movimentacao_list' %}" class="btn btn-outline-secondary btn-lg px-4 fw-bold">
+                            Cancelar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

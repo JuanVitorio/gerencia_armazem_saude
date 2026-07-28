@@ -1,32 +1,83 @@
 {% extends 'estoque/base.html' %}
-{% block title %}Movimentações{% endblock %}
+{% block title %}Movimentações de Estoque{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h1>Movimentações de estoque</h1>
-    <a href="{% url 'estoque:movimentacao_create' %}" class="btn btn-primary">+ Nova movimentação</a>
+<!-- Cabeçalho -->
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4 pb-3 border-bottom">
+    <div>
+        <h1 class="h2 mb-1 d-flex align-items-center gap-2">
+            <i class="bi bi-arrow-down-up text-primary"></i>
+            Movimentações de Estoque
+        </h1>
+        <p class="text-muted fs-5 mb-0">Histórico completo de todas as entradas e saídas de itens no armazém.</p>
+    </div>
+    <a href="{% url 'estoque:movimentacao_create' %}" class="btn btn-success btn-lg shadow-sm">
+        <i class="bi bi-plus-circle-fill"></i> Registrar Nova Movimentação
+    </a>
 </div>
-<table class="table table-striped">
-    <thead><tr><th>Produto</th><th>Tipo</th><th>Qtd.</th><th>Motivo</th><th>Usuário</th><th>Data</th></tr></thead>
-    <tbody>
-    {% for mov in movimentacoes %}
-        <tr>
-            <td><a href="{{ mov.produto.get_absolute_url }}">{{ mov.produto.nome }}</a></td>
-            <td>
-                {% if mov.tipo == 'ENTRADA' %}
-                    <span class="badge bg-success">Entrada</span>
-                {% else %}
-                    <span class="badge bg-danger">Saída</span>
-                {% endif %}
-            </td>
-            <td>{{ mov.quantidade }}</td>
-            <td>{{ mov.motivo|default:'-' }}</td>
-            <td>{{ mov.usuario|default:'-' }}</td>
-            <td>{{ mov.data }}</td>
-        </tr>
-    {% empty %}
-        <tr><td colspan="6" class="text-muted">Nenhuma movimentação registrada.</td></tr>
-    {% endfor %}
-    </tbody>
-</table>
+
+<!-- Tabela de Movimentações -->
+<div class="card-custom shadow-sm mb-4">
+    <div class="card-custom-body p-0">
+        <div class="table-responsive">
+            <table class="table table-custom align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Produto</th>
+                        <th>Tipo de Movimentação</th>
+                        <th>Quantidade</th>
+                        <th>Motivo / Observação</th>
+                        <th>Registrado por</th>
+                        <th class="text-end">Data e Hora</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for mov in movimentacoes %}
+                    <tr>
+                        <td>
+                            <a href="{{ mov.produto.get_absolute_url }}" class="fw-bold text-decoration-none text-dark fs-5">
+                                {{ mov.produto.nome }}
+                            </a>
+                        </td>
+                        <td>
+                            {% if mov.tipo == 'ENTRADA' %}
+                                <span class="badge badge-success-custom fs-6">
+                                    <i class="bi bi-arrow-down-left-circle-fill"></i> Entrada (+ estoque)
+                                </span>
+                            {% else %}
+                                <span class="badge badge-danger-custom fs-6">
+                                    <i class="bi bi-arrow-up-right-circle-fill"></i> Saída (- estoque)
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="fw-bold fs-5 text-dark">
+                            {{ mov.quantidade }} un.
+                        </td>
+                        <td class="text-muted fs-6">
+                            {{ mov.motivo|default:'-' }}
+                        </td>
+                        <td class="fw-semibold text-dark fs-6">
+                            <i class="bi bi-person me-1"></i> {{ mov.usuario|default:'-' }}
+                        </td>
+                        <td class="text-end text-muted fs-6">
+                            <i class="bi bi-clock me-1"></i> {{ mov.data }}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state">
+                                <i class="bi bi-arrow-down-up"></i>
+                                <p class="fs-5 text-muted fw-bold">Nenhuma movimentação registrada até o momento.</p>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 {% include 'estoque/_paginacao.html' %}
 {% endblock %}

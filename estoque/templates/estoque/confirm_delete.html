@@ -1,11 +1,33 @@
 {% extends 'estoque/base.html' %}
-{% block title %}Confirmar exclusão{% endblock %}
+{% block title %}Confirmar Exclusão — Gestão de Estoque{% endblock %}
+
 {% block content %}
-<h1 class="mb-4">Confirmar exclusão</h1>
-<p>Tem certeza que deseja excluir <strong>{{ object }}</strong>? Esta ação não pode ser desfeita.</p>
-<form method="post">
-    {% csrf_token %}
-    <button type="submit" class="btn btn-danger">Sim, excluir</button>
-    <a href="{{ view.success_url }}" class="btn btn-outline-secondary">Cancelar</a>
-</form>
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card-custom shadow-sm border-danger">
+            <div class="card-custom-header bg-danger text-white text-center py-3">
+                <i class="bi bi-exclamation-triangle-fill fs-1"></i>
+                <h2 class="h3 text-white mb-0 mt-2">Confirmar Exclusão</h2>
+            </div>
+            <div class="card-custom-body p-4 text-center">
+                <p class="fs-4 text-dark mb-4">
+                    Tem certeza de que deseja excluir <strong>"{{ object }}"</strong>?
+                </p>
+                <div class="alert alert-warning text-start mb-4">
+                    <i class="bi bi-info-circle-fill me-2"></i>
+                    <strong>Atenção:</strong> Esta ação é permanente e não poderá ser desfeita.
+                </div>
+                <form method="post" class="d-flex justify-content-center gap-3">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-lg px-4 fw-bold">
+                        <i class="bi bi-trash-fill"></i> Sim, Excluir
+                    </button>
+                    <a href="{{ view.success_url }}" class="btn btn-outline-secondary btn-lg px-4 fw-bold">
+                        Cancelar
+                    </a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
