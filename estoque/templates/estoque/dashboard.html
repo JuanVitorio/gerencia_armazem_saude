@@ -4,64 +4,60 @@
 {% block content %}
 <h1 class="mb-4">Dashboard</h1>
 
-<div class="row g-3 mb-4">
-    <div class="col-md-3">
-        <div class="card text-center shadow-sm">
-            <div class="card-body">
-                <h6 class="text-muted">Produtos ativos</h6>
-                <h2>{{ total_produtos }}</h2>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-center shadow-sm">
-            <div class="card-body">
-                <h6 class="text-muted">Itens em estoque</h6>
-                <h2>{{ total_itens }}</h2>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-center shadow-sm">
-            <div class="card-body">
-                <h6 class="text-muted">Valor total (custo)</h6>
-                <h2>R$ {{ valor_total_estoque|floatformat:2|intcomma }}</h2>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-center shadow-sm border-danger">
-            <div class="card-body">
-                <h6 class="text-muted">Estoque baixo</h6>
-                <h2 class="text-danger">{{ produtos_estoque_baixo|length }}</h2>
-            </div>
-        </div>
-    </div>
-</div>
-
 <div class="row g-4">
-    <div class="col-md-6">
-        <h5>⚠️ Produtos com estoque baixo</h5>
+    <div class="col-lg-6">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="mb-0">⚠️ Estoque baixo</h5>
+            <span class="badge bg-danger rounded-pill">{{ produtos_estoque_baixo|length }}</span>
+        </div>
         <table class="table table-sm table-striped">
-            <thead><tr><th>Produto</th><th>Qtd.</th><th>Mínimo</th></tr></thead>
+            <thead><tr><th>Produto</th><th>Categoria</th><th>Qtd.</th></tr></thead>
             <tbody>
             {% for produto in produtos_estoque_baixo %}
                 <tr>
                     <td><a href="{{ produto.get_absolute_url }}">{{ produto.nome }}</a></td>
+                    <td>{{ produto.categoria|default:'-' }}</td>
                     <td>{{ produto.quantidade }}</td>
-                    <td>{{ produto.quantidade_minima }}</td>
                 </tr>
             {% empty %}
-                <tr><td colspan="3" class="text-muted">Nenhum produto com estoque baixo 🎉</td></tr>
+                <tr><td colspan="3" class="text-muted">Nenhum produto com estoque baixo. 🎉</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="d-flex justify-content-between align-items-center mb-2 mt-4">
+            <h5 class="mb-0">⏰ Validade</h5>
+            <span class="badge bg-warning text-dark rounded-pill">{{ produtos_validade|length }}</span>
+        </div>
+        <table class="table table-sm table-striped">
+            <thead><tr><th>Produto</th><th>Validade</th><th>Situação</th></tr></thead>
+            <tbody>
+            {% for produto in produtos_validade %}
+                <tr>
+                    <td><a href="{{ produto.get_absolute_url }}">{{ produto.nome }}</a></td>
+                    <td>{{ produto.data_validade|date:'d/m/Y' }}</td>
+                    <td>
+                        {% if produto.vencido %}
+                            <span class="badge bg-danger">Vencido</span>
+                        {% else %}
+                            <span class="badge bg-warning text-dark">Próximo do vencimento</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="3" class="text-muted">Nenhum produto vencido ou próximo do vencimento.</td></tr>
             {% endfor %}
             </tbody>
         </table>
     </div>
 
-    <div class="col-md-6">
-        <h5>🔄 Últimas movimentações</h5>
+    <div class="col-lg-6">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="mb-0">🔄 Últimas movimentações</h5>
+            <a href="{% url 'estoque:movimentacao_create' %}" class="btn btn-sm btn-primary">+ Nova movimentação</a>
+        </div>
         <table class="table table-sm table-striped">
-            <thead><tr><th>Produto</th><th>Tipo</th><th>Qtd.</th><th>Data</th></tr></thead>
+            <thead><tr><th>Produto</th><th>Tipo</th><th>Qtd.</th><th>Quando</th></tr></thead>
             <tbody>
             {% for mov in ultimas_movimentacoes %}
                 <tr>

@@ -2,10 +2,36 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.urls import reverse
+from django.utils import timezone
 
 
 class Categoria(models.Model):
+    """
+    O "tipo" da categoria orienta o formulário inteligente de produtos
+    (estoque/forms.py + estoque/templates/estoque/produto_form.html):
+    dependendo do tipo escolhido aqui, alguns campos aparecem ou não no
+    cadastro de produtos dessa categoria.
+    """
+    ALIMENTO = 'ALIMENTO'
+    MEDICAMENTO = 'MEDICAMENTO'
+    VACINA = 'VACINA'
+    MATERIAL_ESCRITORIO = 'MATERIAL_ESCRITORIO'
+    MATERIAL_LIMPEZA = 'MATERIAL_LIMPEZA'
+    OUTRO = 'OUTRO'
+    TIPO_CHOICES = [
+        (ALIMENTO, 'Alimento'),
+        (MEDICAMENTO, 'Medicamento'),
+        (VACINA, 'Vacina'),
+        (MATERIAL_ESCRITORIO, 'Material de escritório'),
+        (MATERIAL_LIMPEZA, 'Material de limpeza'),
+        (OUTRO, 'Outro'),
+    ]
+
     nome = models.CharField('Nome', max_length=100, unique=True)
+    tipo = models.CharField(
+        'Tipo', max_length=20, choices=TIPO_CHOICES, default=OUTRO,
+        help_text='Define quais campos aparecem no cadastro de produtos desta categoria.'
+    )
     descricao = models.TextField('Descrição', blank=True)
     criado_em = models.DateTimeField('Criado em', auto_now_add=True)
 
@@ -43,9 +69,25 @@ class Fornecedor(models.Model):
 
 
 class Produto(models.Model):
+    UNIDADE_CHOICES = [
+        ('UN', 'Unidade'),
+        ('CX', 'Caixa'),
+        ('PC', 'Pacote'),
+        ('KG', 'Quilograma'),
+        ('L', 'Litro'),
+        ('ML', 'Mililitro'),
+        ('DS', 'Dose'),
+        ('FR', 'Frasco'),
+        ('AMP', 'Ampola'),
+        ('PAR', 'Par'),
+    ]
+
     nome = models.CharField('Nome', max_length=150)
     descricao = models.TextField('Descrição', blank=True)
-    sku = models.CharField('SKU / Código', max_length=50, unique=True)
+    sku = models.CharField(
+        'Código', max_length=50, unique=True, null=True, blank=True,
+        help_text='Nem todo item precisa de código (ex: alimentos a granel).'
+    )
     codigo_barras = models.CharField('Código de barras', max_length=50, blank=True)
     categoria = models.ForeignKey(
         Categoria, on_delete=models.SET_NULL, null=True, blank=True,
@@ -55,10 +97,19 @@ class Produto(models.Model):
         Fornecedor, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='produtos', verbose_name='Fornecedor'
     )
+    unidade_medida = models.CharField(
+        'Unidade de medida', max_length=3, choices=UNIDADE_CHOICES, default='UN'
+    )
+    lote = models.CharField(
+        'Lote', max_length=50, blank=True,
+        help_text='Número do lote (comum em vacinas e medicamentos).'
+    )
+    data_validade = models.DateField(
+        'Data de validade', null=True, blank=True,
+        help_text='Deixe em branco para itens sem validade (ex: materiais).'
+    )
     preco_custo = models.DecimalField('Preço de custo', max_digits=10, decimal_places=2, default=0)
-    preco_venda = models.DecimalField('Preço de venda', max_digits=10, decimal_places=2, default=0)
     quantidade = models.PositiveIntegerField('Quantidade em estoque', default=0)
-    quantidade_minima = models.PositiveIntegerField('Estoque mínimo', default=5)
     ativo = models.BooleanField('Ativo', default=True)
     criado_em = models.DateTimeField('Criado em', auto_now_add=True)
     atualizado_em = models.DateTimeField('Atualizado em', auto_now=True)
@@ -69,14 +120,36 @@ class Produto(models.Model):
         ordering = ['nome']
 
     def __str__(self):
-        return f'{self.nome} ({self.sku})'
+        return f'{self.nome} ({self.sku})' if self.sku else self.nome
 
     def get_absolute_url(self):
         return reverse('estoque:produto_detail', args=[self.pk])
 
     @property
     def estoque_baixo(self):
-        return self.quantidade <= self.quantidade_minima
+        """
+        Não existe mais um "estoque mínimo" configurável por produto: o
+        sistema usa um limite único (settings.LIMITE_ESTOQUE_BAIXO) para
+        manter o cadastro simples.
+        """
+        return self.quantidade <= settings.LIMITE_ESTOQUE_BAIXO
+
+    @property
+    def dias_para_vencer(self):
+        """Retorna quantos dias faltam para o vencimento (negativo se já venceu)."""
+        if not self.data_validade:
+            return None
+        return (self.data_validade - timezone.localdate()).days
+
+    @property
+    def vencido(self):
+        dias = self.dias_para_vencer
+        return dias is not None and dias < 0
+
+    @property
+    def venc_proximo(self):
+        dias = self.dias_para_vencer
+        return dias is not None and 0 <= dias <= settings.DIAS_ALERTA_VENCIMENTO
 
     @property
     def valor_total_estoque(self):

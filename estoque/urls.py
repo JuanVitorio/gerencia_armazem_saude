@@ -28,7 +28,14 @@ urlpatterns = [
     path('produtos/<int:pk>/editar/', views.ProdutoUpdateView.as_view(), name='produto_update'),
     path('produtos/<int:pk>/excluir/', views.ProdutoDeleteView.as_view(), name='produto_delete'),
 
+    # Ação rápida de movimentação (usada nos botões +/- da listagem de produtos)
+    path('produtos/<int:pk>/movimentacao-rapida/', views.MovimentacaoRapidaView.as_view(), name='movimentacao_rapida'),
+
     # Movimentações
     path('movimentacoes/', views.MovimentacaoListView.as_view(), name='movimentacao_list'),
     path('movimentacoes/nova/', views.MovimentacaoCreateView.as_view(), name='movimentacao_create'),
+
+    # Relatórios
+    path('relatorios/', views.RelatorioListView.as_view(), name='relatorio_list'),
+    path('relatorios/gerar/<str:tipo>/', views.RelatorioGerarView.as_view(), name='relatorio_gerar'),
 ]

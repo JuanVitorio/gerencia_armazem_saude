@@ -7,14 +7,9 @@
 </div>
 
 <form method="get" class="row g-2 mb-3">
-    <div class="col-md-4">{{ filtro_form.q }}</div>
+    <div class="col-md-5">{{ filtro_form.q }}</div>
     <div class="col-md-3">{{ filtro_form.categoria }}</div>
-    <div class="col-md-3 d-flex align-items-center">
-        <div class="form-check">
-            {{ filtro_form.apenas_estoque_baixo }}
-            <label class="form-check-label" for="id_apenas_estoque_baixo">Apenas estoque baixo</label>
-        </div>
-    </div>
+    <div class="col-md-2">{{ filtro_form.situacao }}</div>
     <div class="col-md-2">
         <button type="submit" class="btn btn-outline-secondary w-100">Filtrar</button>
     </div>
@@ -23,17 +18,40 @@
 <table class="table table-striped align-middle">
     <thead>
         <tr>
-            <th>Nome</th><th>SKU</th><th>Categoria</th><th>Qtd.</th><th>Preço venda</th><th></th>
+            <th>Nome</th><th>Categoria</th><th>Qtd.</th><th>Validade</th><th>Ação rápida</th><th></th>
         </tr>
     </thead>
     <tbody>
     {% for produto in produtos %}
         <tr class="{% if produto.estoque_baixo %}table-danger{% endif %}">
-            <td><a href="{{ produto.get_absolute_url }}">{{ produto.nome }}</a></td>
-            <td>{{ produto.sku }}</td>
+            <td>
+                <a href="{{ produto.get_absolute_url }}">{{ produto.nome }}</a>
+                {% if produto.sku %}<div class="text-muted small">{{ produto.sku }}</div>{% endif %}
+            </td>
             <td>{{ produto.categoria|default:'-' }}</td>
-            <td>{{ produto.quantidade }}</td>
-            <td>R$ {{ produto.preco_venda }}</td>
+            <td>{{ produto.quantidade }} {{ produto.get_unidade_medida_display }}</td>
+            <td>
+                {% if produto.data_validade %}
+                    {% if produto.vencido %}
+                        <span class="badge bg-danger">Vencido</span>
+                    {% elif produto.venc_proximo %}
+                        <span class="badge bg-warning text-dark">Próx. {{ produto.data_validade|date:'d/m/Y' }}</span>
+                    {% else %}
+                        {{ produto.data_validade|date:'d/m/Y' }}
+                    {% endif %}
+                {% else %}
+                    <span class="text-muted">-</span>
+                {% endif %}
+            </td>
+            <td>
+                <form action="{% url 'estoque:movimentacao_rapida' produto.pk %}" method="post" class="d-flex gap-1">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <input type="number" name="quantidade" value="1" min="1" class="form-control form-control-sm" style="width: 4.5rem;">
+                    <button type="submit" name="tipo" value="ENTRADA" class="btn btn-sm btn-outline-success" title="Registrar entrada">+</button>
+                    <button type="submit" name="tipo" value="SAIDA" class="btn btn-sm btn-outline-danger" title="Registrar saída">−</button>
+                </form>
+            </td>
             <td class="text-end">
                 <a href="{% url 'estoque:produto_update' produto.pk %}" class="btn btn-sm btn-outline-secondary">Editar</a>
                 <a href="{% url 'estoque:produto_delete' produto.pk %}" class="btn btn-sm btn-outline-danger">Excluir</a>

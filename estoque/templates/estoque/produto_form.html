@@ -2,10 +2,14 @@
 {% block title %}{% if object %}Editar{% else %}Novo{% endif %} produto{% endblock %}
 {% block content %}
 <h1 class="mb-4">{% if object %}Editar{% else %}Novo{% endif %} produto</h1>
+<p class="text-muted small">
+    Campos marcados com <span class="text-danger">*</span> são obrigatórios.
+    Alguns campos aparecem ou somem automaticamente conforme a categoria escolhida.
+</p>
 <form method="post" novalidate>
     {% csrf_token %}
     {% for field in form %}
-        <div class="mb-3">
+        <div class="mb-3" id="campo-{{ field.name }}">
             {{ field.label_tag }}
             {{ field }}
             {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
@@ -16,4 +20,41 @@
     <button type="submit" class="btn btn-primary">Salvar</button>
     <a href="{% url 'estoque:produto_list' %}" class="btn btn-outline-secondary">Cancelar</a>
 </form>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+    // Campos que aparecem/somem dependendo do tipo da categoria escolhida.
+    // Ajuste estas listas se a realidade da sua secretaria for diferente.
+    var CAMPOS_CONDICIONAIS = ['sku', 'codigo_barras', 'fornecedor', 'lote', 'data_validade'];
+    var CAMPOS_POR_TIPO = {
+        ALIMENTO: ['fornecedor', 'data_validade'],
+        MEDICAMENTO: ['sku', 'codigo_barras', 'fornecedor', 'lote', 'data_validade'],
+        VACINA: ['sku', 'codigo_barras', 'lote', 'data_validade'],
+        MATERIAL_ESCRITORIO: ['sku', 'codigo_barras', 'fornecedor'],
+        MATERIAL_LIMPEZA: ['sku', 'codigo_barras', 'fornecedor', 'data_validade'],
+        OUTRO: CAMPOS_CONDICIONAIS
+    };
+
+    var selectCategoria = document.getElementById('id_categoria');
+    if (!selectCategoria) { return; }
+
+    function aplicarCamposVisiveis() {
+        var opcao = selectCategoria.options[selectCategoria.selectedIndex];
+        var tipo = opcao ? opcao.getAttribute('data-tipo') : null;
+        var permitidos = (tipo && CAMPOS_POR_TIPO[tipo]) ? CAMPOS_POR_TIPO[tipo] : CAMPOS_CONDICIONAIS;
+
+        CAMPOS_CONDICIONAIS.forEach(function (nome) {
+            var wrapper = document.getElementById('campo-' + nome);
+            if (wrapper) {
+                wrapper.style.display = permitidos.indexOf(nome) !== -1 ? '' : 'none';
+            }
+        });
+    }
+
+    selectCategoria.addEventListener('change', aplicarCamposVisiveis);
+    aplicarCamposVisiveis();
+})();
+</script>
 {% endblock %}

@@ -5,7 +5,8 @@ from .models import Categoria, Fornecedor, Movimentacao, Produto
 
 @admin.register(Categoria)
 class CategoriaAdmin(admin.ModelAdmin):
-    list_display = ('nome', 'criado_em')
+    list_display = ('nome', 'tipo', 'criado_em')
+    list_filter = ('tipo',)
     search_fields = ('nome',)
 
 
@@ -20,10 +21,10 @@ class FornecedorAdmin(admin.ModelAdmin):
 class ProdutoAdmin(admin.ModelAdmin):
     list_display = (
         'nome', 'sku', 'categoria', 'fornecedor', 'quantidade',
-        'quantidade_minima', 'preco_venda', 'ativo',
+        'unidade_medida', 'data_validade', 'ativo',
     )
     list_filter = ('categoria', 'fornecedor', 'ativo')
-    search_fields = ('nome', 'sku', 'codigo_barras')
+    search_fields = ('nome', 'sku', 'codigo_barras', 'lote')
     autocomplete_fields = ('categoria', 'fornecedor')
 
 
