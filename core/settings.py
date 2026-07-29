@@ -10,7 +10,7 @@ SECRET_KEY = 'django-insecure-troque-esta-chave-em-producao'
 
 DEBUG = True
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['*', 'juanvitoriodev.pythonanywhere.com']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
