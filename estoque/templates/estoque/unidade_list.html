@@ -1,0 +1,74 @@
+{% extends 'estoque/base.html' %}
+{% block title %}Unidades — Gestão de Estoque{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title"><i class="bi bi-building text-primary"></i> Unidades</h1>
+            <p class="page-subtitle">Postos de saúde e secretarias com estoque independente.</p>
+        </div>
+        <a href="{% url 'estoque:unidade_create' %}" class="btn btn-primary btn-sm" id="btn-nova-unidade">
+            <i class="bi bi-plus-lg"></i> Nova Unidade
+        </a>
+    </div>
+
+    <div class="table-card">
+        <div class="table-responsive">
+            <table class="data-table" id="tabela-unidades">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Tipo</th>
+                        <th>Produtos</th>
+                        <th>Status</th>
+                        <th class="text-end">Opções</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for unidade in unidades %}
+                    <tr>
+                        <td>
+                            <a href="{{ unidade.get_absolute_url }}" class="item-link-dark">
+                                {{ unidade.nome }}
+                            </a>
+                        </td>
+                        <td><span class="cat-tag">{{ unidade.get_tipo_display }}</span></td>
+                        <td>{{ unidade.total_produtos }}</td>
+                        <td>
+                            {% if unidade.ativa %}
+                                <span class="status-tag status-success">Ativa</span>
+                            {% else %}
+                                <span class="status-tag status-muted">Inativa</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <div class="btn-group-compact">
+                                <a href="{{ unidade.get_absolute_url }}" class="btn-icon" title="Ver">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a href="{% url 'estoque:unidade_update' unidade.pk %}" class="btn-icon" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="5">
+                            <div class="empty-state-inline">
+                                <i class="bi bi-building text-muted"></i>
+                                <p>Nenhuma unidade cadastrada.</p>
+                                <a href="{% url 'estoque:unidade_create' %}" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-plus-lg"></i> Criar Primeira Unidade
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

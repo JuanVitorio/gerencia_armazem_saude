@@ -1,0 +1,87 @@
+{% extends 'estoque/base.html' %}
+{% block title %}{{ unidade.nome }} — Detalhes da Unidade{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <h1 class="page-title mb-0">{{ unidade.nome }}</h1>
+                <span class="cat-tag">{{ unidade.get_tipo_display }}</span>
+                {% if unidade.ativa %}
+                    <span class="status-tag status-success">Ativa</span>
+                {% else %}
+                    <span class="status-tag status-muted">Inativa</span>
+                {% endif %}
+            </div>
+            {% if unidade.descricao %}
+            <p class="page-subtitle">{{ unidade.descricao }}</p>
+            {% endif %}
+        </div>
+        <div class="page-actions">
+            <a href="{% url 'estoque:unidade_update' unidade.pk %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-pencil"></i> Editar Unidade
+            </a>
+            <a href="{% url 'estoque:unidade_list' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Voltar
+            </a>
+        </div>
+    </div>
+
+    <div class="detail-stats">
+        <div class="detail-stat">
+            <span class="detail-stat-label">Produtos em Estoque</span>
+            <span class="detail-stat-value">{{ total_produtos }}</span>
+        </div>
+        <div class="detail-stat">
+            <span class="detail-stat-label">Usuários Vinculados</span>
+            <span class="detail-stat-value">{{ membros|length }}</span>
+        </div>
+    </div>
+
+    <div class="table-card mt-3">
+        <div class="table-card-header">
+            <h2 class="table-card-title"><i class="bi bi-people text-primary me-1"></i> Funcionários com Acesso</h2>
+        </div>
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Usuário</th>
+                        <th>Nome Completo</th>
+                        <th>E-mail</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for membro in membros %}
+                    <tr>
+                        <td>
+                            <span class="fw-bold">{{ membro.usuario.username }}</span>
+                        </td>
+                        <td>{{ membro.usuario.get_full_name|default:'—' }}</td>
+                        <td>{{ membro.usuario.email|default:'—' }}</td>
+                        <td>
+                            {% if membro.usuario.is_active %}
+                                <span class="status-tag status-success">Ativo</span>
+                            {% else %}
+                                <span class="status-tag status-muted">Inativo</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="4">
+                            <div class="empty-state-inline">
+                                <i class="bi bi-people text-muted"></i>
+                                <p>Nenhum usuário vinculado a esta unidade.</p>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

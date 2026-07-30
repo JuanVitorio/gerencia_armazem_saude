@@ -2,61 +2,82 @@
 {% block title %}Registrar Movimentação — Gestão de Estoque{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-lg-8">
-        <!-- Cabeçalho -->
-        <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
-            <div>
-                <h1 class="h2 mb-1 d-flex align-items-center gap-2">
-                    <i class="bi bi-arrow-down-up text-primary"></i>
-                    Registrar Movimentação
-                </h1>
-                <p class="text-muted fs-5 mb-0">Lance entrada (adicionar) ou saída (retirar) de produtos no estoque.</p>
-            </div>
-            <a href="{% url 'estoque:movimentacao_list' %}" class="btn btn-outline-secondary btn-lg">
-                <i class="bi bi-arrow-left"></i> Voltar à Lista
-            </a>
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">
+                <i class="bi bi-arrow-down-up text-primary"></i> Registrar Movimentação
+            </h1>
+            <p class="page-subtitle">Lance uma entrada (recebimento) ou saída (uso/distribuição) no estoque.</p>
         </div>
+        <a href="{% url 'estoque:movimentacao_list' %}" class="btn btn-outline-secondary btn-sm" id="btn-voltar-mov">
+            <i class="bi bi-arrow-left"></i> Voltar
+        </a>
+    </div>
 
-        <div class="card-custom shadow-sm mb-5">
-            <div class="card-custom-body bg-white p-4">
-                <form method="post" novalidate>
-                    {% csrf_token %}
+    <div class="form-card" style="max-width: 640px;">
+        <form method="post" novalidate id="form-movimentacao">
+            {% csrf_token %}
 
-                    {% for error in form.non_field_errors %}
-                        <div class="alert alert-danger mb-4 shadow-sm">
-                            <i class="bi bi-exclamation-octagon-fill me-2"></i> {{ error }}
-                        </div>
-                    {% endfor %}
-
-                    <div class="row g-3">
-                        {% for field in form %}
-                            <div class="col-12 mb-2">
-                                <label for="{{ field.id_for_label }}" class="form-label fs-5 fw-bold text-dark">
-                                    {{ field.label }}
-                                </label>
-                                {{ field }}
-                                {% if field.help_text %}
-                                    <div class="form-text fs-6"><i class="bi bi-info-circle me-1 text-muted"></i> {{ field.help_text }}</div>
-                                {% endif %}
-                                {% for error in field.errors %}
-                                    <div class="text-danger fw-bold mt-1 fs-6"><i class="bi bi-x-circle-fill me-1"></i> {{ error }}</div>
-                                {% endfor %}
-                            </div>
-                        {% endfor %}
-                    </div>
-
-                    <div class="d-flex gap-3 mt-4 pt-3 border-top">
-                        <button type="submit" class="btn btn-success btn-lg px-4 shadow-sm fw-bold">
-                            <i class="bi bi-check-circle-fill"></i> Confirmar e Registrar
-                        </button>
-                        <a href="{% url 'estoque:movimentacao_list' %}" class="btn btn-outline-secondary btn-lg px-4 fw-bold">
-                            Cancelar
-                        </a>
-                    </div>
-                </form>
+            {% for error in form.non_field_errors %}
+            <div class="alert-inline alert-inline-danger">
+                <i class="bi bi-exclamation-octagon-fill"></i> {{ error }}
             </div>
-        </div>
+            {% endfor %}
+
+            <div class="form-row">
+                <div class="form-col-full">
+                    <label for="{{ form.produto.id_for_label }}" class="form-label-compact">
+                        Produto <span class="req">*</span>
+                    </label>
+                    {{ form.produto }}
+                    {% for e in form.produto.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-col-sm">
+                    <label class="form-label-compact">Tipo <span class="req">*</span></label>
+                    <div class="tipo-btn-group">
+                        <label class="tipo-btn tipo-btn-entrada">
+                            <input type="radio" name="tipo" value="ENTRADA"
+                                   {% if form.tipo.value == 'ENTRADA' or not form.tipo.value %}checked{% endif %}>
+                            <i class="bi bi-plus-lg"></i> Entrada
+                        </label>
+                        <label class="tipo-btn tipo-btn-saida">
+                            <input type="radio" name="tipo" value="SAIDA"
+                                   {% if form.tipo.value == 'SAIDA' %}checked{% endif %}>
+                            <i class="bi bi-dash-lg"></i> Saída
+                        </label>
+                    </div>
+                    {% for e in form.tipo.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="form-col-sm">
+                    <label for="{{ form.quantidade.id_for_label }}" class="form-label-compact">
+                        Quantidade <span class="req">*</span>
+                    </label>
+                    {{ form.quantidade }}
+                    {% for e in form.quantidade.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-col-full">
+                    <label for="{{ form.motivo.id_for_label }}" class="form-label-compact">
+                        Motivo / Observação <span class="form-hint">(opcional)</span>
+                    </label>
+                    {{ form.motivo }}
+                    {% for e in form.motivo.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-success" id="btn-confirmar-mov">
+                    <i class="bi bi-check-circle-fill"></i> Confirmar e Registrar
+                </button>
+                <a href="{% url 'estoque:movimentacao_list' %}" class="btn btn-outline-secondary">Cancelar</a>
+            </div>
+        </form>
     </div>
 </div>
 {% endblock %}

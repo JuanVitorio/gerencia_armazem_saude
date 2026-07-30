@@ -1,0 +1,82 @@
+{% extends 'estoque/base.html' %}
+{% block title %}Usuários — Gestão de Estoque{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title"><i class="bi bi-people text-primary"></i> Usuários do Sistema</h1>
+            <p class="page-subtitle">Gerencie o acesso de funcionários por unidade ou administradores.</p>
+        </div>
+        <a href="{% url 'estoque:usuario_create' %}" class="btn btn-primary btn-sm" id="btn-novo-usuario">
+            <i class="bi bi-person-plus"></i> Novo Usuário
+        </a>
+    </div>
+
+    <div class="table-card">
+        <div class="table-responsive">
+            <table class="data-table" id="tabela-usuarios">
+                <thead>
+                    <tr>
+                        <th>Usuário</th>
+                        <th>Nome Completo</th>
+                        <th>Unidade Acessada</th>
+                        <th>Nível de Acesso</th>
+                        <th>Status</th>
+                        <th class="text-end">Opções</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for u in usuarios %}
+                    <tr>
+                        <td>
+                            <span class="fw-bold">{{ u.username }}</span>
+                        </td>
+                        <td>{{ u.get_full_name|default:'—' }}</td>
+                        <td>
+                            {% if u.perfil.unidade %}
+                                <span class="cat-tag"><i class="bi bi-building"></i> {{ u.perfil.unidade.nome }}</span>
+                            {% elif u.is_superuser or u.perfil.is_admin %}
+                                <span class="text-muted">Todas (Admin)</span>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if u.is_superuser or u.perfil.is_admin %}
+                                <span class="status-tag status-primary"><i class="bi bi-shield-check"></i> Administrador</span>
+                            {% else %}
+                                <span class="status-tag status-muted"><i class="bi bi-person"></i> Usuário Comum</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if u.is_active %}
+                                <span class="status-tag status-success">Ativo</span>
+                            {% else %}
+                                <span class="status-tag status-danger">Inativo</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <div class="btn-group-compact">
+                                <a href="{% url 'estoque:usuario_update' u.pk %}" class="btn-icon" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state-inline">
+                                <i class="bi bi-people text-muted"></i>
+                                <p>Nenhum usuário cadastrado.</p>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

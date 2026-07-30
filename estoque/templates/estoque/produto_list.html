@@ -2,127 +2,139 @@
 {% block title %}Produtos — Gestão de Estoque{% endblock %}
 
 {% block content %}
-<!-- Cabeçalho -->
-<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4 pb-3 border-bottom">
-    <div>
-        <h1 class="h2 mb-1 d-flex align-items-center gap-2">
-            <i class="bi bi-box-seam text-primary"></i>
-            Produtos Cadastrados
-        </h1>
-        <p class="text-muted fs-5 mb-0">Consulte, altere ou adicione rapidamente novos itens ao armazém.</p>
-    </div>
-    <a href="{% url 'estoque:produto_create' %}" class="btn btn-primary btn-lg shadow-sm">
-        <i class="bi bi-plus-circle-fill"></i> Cadastrar Novo Produto
-    </a>
-</div>
+<div class="page-container">
 
-<!-- Filtros de Busca -->
-<div class="card-custom shadow-sm mb-4">
-    <div class="card-custom-body bg-white">
-        <form method="get" class="row g-3 align-items-end">
-            <div class="col-md-4">
-                <label class="form-label">
-                    <i class="bi bi-search text-primary me-1"></i> Buscar por Nome / Código
-                </label>
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">
+                <i class="bi bi-box-seam text-primary"></i> Estoque
+            </h1>
+            {% if unidade_atual %}
+            <p class="page-subtitle"><i class="bi bi-geo-alt-fill text-primary"></i> {{ unidade_atual.get_tipo_display }} — {{ unidade_atual.nome }}</p>
+            {% endif %}
+        </div>
+        <a href="{% url 'estoque:produto_create' %}" class="btn btn-primary btn-sm" id="btn-cadastrar-produto">
+            <i class="bi bi-plus-lg"></i> Cadastrar Produto
+        </a>
+    </div>
+
+    <!-- Filtros compactos -->
+    <div class="filter-bar">
+        <form method="get" class="filter-form" id="form-filtro-produtos">
+            <div class="filter-field filter-field-grow">
+                <i class="bi bi-search filter-icon"></i>
                 {{ filtro_form.q }}
             </div>
-            <div class="col-md-3">
-                <label class="form-label">
-                    <i class="bi bi-tags text-primary me-1"></i> Categoria
-                </label>
+            <div class="filter-field">
                 {{ filtro_form.categoria }}
             </div>
-            <div class="col-md-3">
-                <label class="form-label">
-                    <i class="bi bi-funnel text-primary me-1"></i> Situação
-                </label>
+            <div class="filter-field">
                 {{ filtro_form.situacao }}
             </div>
-            <div class="col-md-2">
-                <button type="submit" class="btn btn-primary btn-lg w-100 fw-bold">
-                    <i class="bi bi-filter"></i> Filtrar
-                </button>
-            </div>
+            <button type="submit" class="btn btn-primary btn-sm" id="btn-filtrar">
+                <i class="bi bi-filter"></i> Filtrar
+            </button>
+            {% if request.GET %}
+            <a href="{% url 'estoque:produto_list' %}" class="btn btn-outline-secondary btn-sm" title="Limpar filtros">
+                <i class="bi bi-x-lg"></i>
+            </a>
+            {% endif %}
         </form>
     </div>
-</div>
 
-<!-- Tabela de Produtos -->
-<div class="card-custom shadow-sm mb-4">
-    <div class="card-custom-body p-0">
+    <!-- Tabela de Produtos -->
+    <div class="table-card">
         <div class="table-responsive">
-            <table class="table table-custom align-middle mb-0">
+            <table class="data-table" id="tabela-produtos">
                 <thead>
                     <tr>
-                        <th style="min-width: 200px;">Produto</th>
+                        <th>Produto</th>
                         <th>Categoria</th>
-                        <th>Qtd. em Estoque</th>
+                        <th>Qtd.</th>
                         <th>Validade</th>
-                        <th>Ação Rápida (+/-)</th>
+                        <th class="col-acao-rapida">Ação Rápida</th>
                         <th class="text-end">Opções</th>
                     </tr>
                 </thead>
                 <tbody>
                 {% for produto in produtos %}
-                    <tr class="{% if produto.estoque_baixo %}row-danger-highlight{% endif %}">
+                    <tr class="{% if produto.vencido %}row-vencido{% elif produto.estoque_baixo %}row-alerta{% endif %}">
                         <td>
-                            <a href="{{ produto.get_absolute_url }}" class="fw-bold text-decoration-none text-dark fs-5">
+                            <a href="{{ produto.get_absolute_url }}" class="item-link-dark">
                                 {{ produto.nome }}
                             </a>
-                            {% if produto.sku %}
-                                <div class="text-muted fs-6"><i class="bi bi-barcode"></i> SKU: {{ produto.sku }}</div>
+                            {% if produto.detalhes %}
+                            <span class="item-detail">{{ produto.detalhes }}</span>
                             {% endif %}
+                            {% if produto.sku %}<span class="item-code"><i class="bi bi-upc"></i> {{ produto.sku }}</span>{% endif %}
                         </td>
                         <td>
                             {% if produto.categoria %}
-                                <span class="badge badge-secondary-custom fs-6">{{ produto.categoria }}</span>
+                            <span class="cat-tag">{{ produto.categoria.nome }}</span>
                             {% else %}
-                                <span class="text-muted">-</span>
+                            <span class="text-muted">—</span>
                             {% endif %}
                         </td>
                         <td>
-                            <span class="fs-5 fw-bold {% if produto.estoque_baixo %}text-danger{% else %}text-dark{% endif %}">
-                                {{ produto.quantidade }} {{ produto.get_unidade_medida_display }}
+                            <span class="qty-text {% if produto.estoque_baixo %}qty-text-danger{% endif %}">
+                                {{ produto.quantidade }}
+                                <small>{{ produto.get_unidade_medida_display }}</small>
                             </span>
                             {% if produto.estoque_baixo %}
-                                <span class="badge badge-danger-custom ms-1 fs-6">Estoque Baixo</span>
+                            <span class="status-tag status-danger">Baixo</span>
                             {% endif %}
                         </td>
                         <td>
                             {% if produto.data_validade %}
                                 {% if produto.vencido %}
-                                    <span class="badge badge-danger-custom fs-6"><i class="bi bi-x-circle-fill"></i> Vencido</span>
+                                    <span class="status-tag status-danger">
+                                        <i class="bi bi-x-circle"></i> Vencido
+                                    </span>
                                 {% elif produto.venc_proximo %}
-                                    <span class="badge badge-warning-custom fs-6"><i class="bi bi-clock"></i> Próx. {{ produto.data_validade|date:'d/m/Y' }}</span>
+                                    <span class="status-tag status-warning">
+                                        <i class="bi bi-clock"></i> {{ produto.data_validade|date:'d/m/Y' }}
+                                    </span>
                                 {% else %}
-                                    <span class="fs-6 fw-semibold text-dark"><i class="bi bi-calendar3 me-1"></i> {{ produto.data_validade|date:'d/m/Y' }}</span>
+                                    <span class="date-text">{{ produto.data_validade|date:'d/m/Y' }}</span>
                                 {% endif %}
                             {% else %}
-                                <span class="text-muted fs-6">-</span>
+                                <span class="text-muted">—</span>
                             {% endif %}
                         </td>
                         <td>
-                            <form action="{% url 'estoque:movimentacao_rapida' produto.pk %}" method="post" class="d-flex align-items-center gap-1">
+                            <form action="{% url 'estoque:movimentacao_rapida' produto.pk %}" method="post"
+                                  class="acao-rapida-form" id="form-rapida-{{ produto.pk }}">
                                 {% csrf_token %}
                                 <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                <input type="number" name="quantidade" value="1" min="1" class="form-control form-control-sm text-center fw-bold" style="width: 4rem; font-size: 1.1rem; height: 38px;">
-                                <button type="submit" name="tipo" value="ENTRADA" class="btn btn-sm btn-success px-2 py-1 fw-bold" title="Adicionar ao Estoque (+ Entrada)" style="height: 38px;">
+                                <input type="number" name="quantidade" value="1" min="1" max="9999"
+                                       class="acao-rapida-qty" title="Quantidade" aria-label="Quantidade">
+                                <button type="submit" name="tipo" value="ENTRADA"
+                                        class="btn-entrada" title="Dar entrada no estoque"
+                                        id="btn-entrada-{{ produto.pk }}">
                                     <i class="bi bi-plus-lg"></i>
                                 </button>
-                                <button type="submit" name="tipo" value="SAIDA" class="btn btn-sm btn-danger px-2 py-1 fw-bold" title="Retirar do Estoque (- Saída)" style="height: 38px;">
+                                <button type="submit" name="tipo" value="SAIDA"
+                                        class="btn-saida" title="Registrar saída do estoque"
+                                        id="btn-saida-{{ produto.pk }}">
                                     <i class="bi bi-dash-lg"></i>
                                 </button>
                             </form>
                         </td>
                         <td class="text-end">
-                            <div class="btn-group">
-                                <a href="{{ produto.get_absolute_url }}" class="btn btn-sm btn-outline-primary fw-bold" title="Ver detalhes">
-                                    <i class="bi bi-eye"></i> Ver
+                            <div class="btn-group-compact">
+                                <a href="{{ produto.get_absolute_url }}"
+                                   class="btn-icon" title="Ver detalhes"
+                                   id="btn-ver-{{ produto.pk }}">
+                                    <i class="bi bi-eye"></i>
                                 </a>
-                                <a href="{% url 'estoque:produto_update' produto.pk %}" class="btn btn-sm btn-outline-secondary fw-bold" title="Editar produto">
+                                <a href="{% url 'estoque:produto_update' produto.pk %}"
+                                   class="btn-icon" title="Editar"
+                                   id="btn-editar-{{ produto.pk }}">
                                     <i class="bi bi-pencil"></i>
                                 </a>
-                                <a href="{% url 'estoque:produto_delete' produto.pk %}" class="btn btn-sm btn-outline-danger fw-bold" title="Excluir produto">
+                                <a href="{% url 'estoque:produto_delete' produto.pk %}"
+                                   class="btn-icon btn-icon-danger" title="Excluir"
+                                   id="btn-excluir-{{ produto.pk }}">
                                     <i class="bi bi-trash"></i>
                                 </a>
                             </div>
@@ -131,9 +143,12 @@
                 {% empty %}
                     <tr>
                         <td colspan="6">
-                            <div class="empty-state">
+                            <div class="empty-state-inline">
                                 <i class="bi bi-inbox"></i>
-                                <p class="fs-5 text-muted fw-bold">Nenhum produto encontrado com os filtros atuais.</p>
+                                <p>Nenhum produto encontrado.</p>
+                                <a href="{% url 'estoque:produto_create' %}" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-plus-lg"></i> Cadastrar Produto
+                                </a>
                             </div>
                         </td>
                     </tr>
@@ -142,7 +157,8 @@
             </table>
         </div>
     </div>
-</div>
 
-{% include 'estoque/_paginacao.html' %}
+    {% include 'estoque/_paginacao.html' %}
+
+</div>
 {% endblock %}
