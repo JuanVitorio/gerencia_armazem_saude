@@ -1,16 +1,14 @@
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth.models import User
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 
-from .models import Categoria, Fornecedor, Movimentacao, Produto
+from .models import Categoria, Movimentacao, PerfilUsuario, Produto, Unidade
 
 
 class BaseFormMixin:
-    """
-    Aplica classes do Bootstrap a todos os campos automaticamente e marca
-    com um asterisco (*) o rótulo de todo campo obrigatório.
-    """
+    """Aplica classes CSS a todos os campos e marca campos obrigatórios com asterisco."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -24,10 +22,8 @@ class BaseFormMixin:
 
 class CategoriaSelect(forms.Select):
     """
-    Select de categoria que expõe o "tipo" de cada categoria via
-    data-tipo em cada <option>. É isso que o JavaScript do formulário de
-    produto (produto_form.html) usa para mostrar/esconder campos
-    conforme a categoria escolhida, sem precisar de requisições extras.
+    Select que expõe o 'tipo' de cada categoria via data-tipo em cada <option>.
+    O JS do produto_form.html usa esse atributo para mostrar/esconder campos.
     """
 
     def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
@@ -42,40 +38,26 @@ class CategoriaSelect(forms.Select):
         return option
 
 
-class CategoriaForm(BaseFormMixin, forms.ModelForm):
-    class Meta:
-        model = Categoria
-        fields = ['nome', 'tipo', 'descricao']
-        widgets = {
-            'descricao': forms.Textarea(attrs={'rows': 3}),
-        }
-        help_texts = {
-            'tipo': 'Controla quais campos aparecem no cadastro de produtos desta categoria.',
-        }
-
-
-class FornecedorForm(BaseFormMixin, forms.ModelForm):
-    class Meta:
-        model = Fornecedor
-        fields = ['nome', 'cnpj_cpf', 'telefone', 'email', 'endereco', 'ativo']
-
-
 class ProdutoForm(BaseFormMixin, forms.ModelForm):
     class Meta:
         model = Produto
         fields = [
-            'nome', 'descricao', 'categoria', 'fornecedor',
-            'sku', 'codigo_barras', 'lote',
-            'unidade_medida', 'data_validade',
-            'preco_custo', 'quantidade', 'ativo',
+            'nome', 'categoria', 'detalhes', 'descricao',
+            'sku', 'lote', 'data_validade',
+            'unidade_medida', 'quantidade',
         ]
         widgets = {
-            'descricao': forms.Textarea(attrs={'rows': 3}),
+            'descricao': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Observações adicionais (opcional)'}),
             'data_validade': forms.DateInput(attrs={'type': 'date'}),
             'categoria': CategoriaSelect(),
+            'nome': forms.TextInput(attrs={'autofocus': True, 'placeholder': 'Ex: Amoxicilina 500mg'}),
+            'detalhes': forms.TextInput(attrs={'placeholder': 'Ex: 500mg/5ml, cor azul, tamanho M...'}),
+            'sku': forms.TextInput(attrs={'placeholder': 'Código interno (opcional)'}),
+            'lote': forms.TextInput(attrs={'placeholder': 'Número do lote'}),
         }
         help_texts = {
-            'sku': 'Nem todo item precisa de código (ex: alimentos a granel).',
+            'detalhes': 'Cor, tamanho, modelo, concentração, etc.',
+            'sku': 'Código interno ou de referência.',
         }
 
 
@@ -83,10 +65,22 @@ class MovimentacaoForm(BaseFormMixin, forms.ModelForm):
     class Meta:
         model = Movimentacao
         fields = ['produto', 'tipo', 'quantidade', 'motivo']
+        widgets = {
+            'motivo': forms.TextInput(attrs={'placeholder': 'Ex: Recebimento de NF, uso em atendimento...'}),
+        }
+
+    def __init__(self, *args, unidade=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if unidade is not None:
+            self.fields['produto'].queryset = Produto.objects.filter(
+                unidade=unidade, ativo=True
+            ).order_by('nome')
+        else:
+            self.fields['produto'].queryset = Produto.objects.filter(ativo=True).order_by('nome')
 
     def clean_quantidade(self):
-        quantidade = self.cleaned_data['quantidade']
-        if quantidade <= 0:
+        quantidade = self.cleaned_data.get('quantidade')
+        if not quantidade or quantidade <= 0:
             raise forms.ValidationError('A quantidade deve ser maior que zero.')
         return quantidade
 
@@ -101,17 +95,85 @@ class ProdutoFiltroForm(forms.Form):
 
     q = forms.CharField(
         label='Buscar', required=False,
-        widget=forms.TextInput(attrs={'placeholder': 'Nome, código, código de barras, lote...'})
+        widget=forms.TextInput(attrs={
+            'placeholder': 'Nome, código, lote...',
+            'class': 'form-control',
+            'id': 'id_busca_produto',
+        }),
     )
-    categoria = forms.ModelChoiceField(label='Categoria', queryset=Categoria.objects.all(), required=False)
-    situacao = forms.ChoiceField(label='Situação', choices=SITUACAO_CHOICES, required=False)
+    categoria = forms.ModelChoiceField(
+        label='Categoria', queryset=Categoria.objects.all(), required=False,
+        empty_label='Todas as categorias',
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
+    situacao = forms.ChoiceField(
+        label='Situação', choices=SITUACAO_CHOICES, required=False,
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
+
+
+class MovimentacaoFiltroForm(forms.Form):
+    q = forms.CharField(
+        label='Produto', required=False,
+        widget=forms.TextInput(attrs={
+            'placeholder': 'Buscar produto...',
+            'class': 'form-control',
+        }),
+    )
+    tipo = forms.ChoiceField(
+        label='Tipo',
+        choices=[('', 'Entrada e Saída'), ('ENTRADA', 'Entrada'), ('SAIDA', 'Saída')],
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
+    data_inicio = forms.DateField(
+        label='De', required=False,
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+    )
+    data_fim = forms.DateField(
+        label='Até', required=False,
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+    )
+
+
+class PerfilUsuarioForm(BaseFormMixin, forms.ModelForm):
+    class Meta:
+        model = PerfilUsuario
+        fields = ['unidade']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for field in self.fields.values():
-            css = 'form-check-input' if isinstance(field.widget, forms.CheckboxInput) else 'form-control'
-            field.widget.attrs['class'] = css
+        self.fields['unidade'].required = False
+        self.fields['unidade'].empty_label = '— Administrador (acesso total) —'
+
+
+class UsuarioForm(BaseFormMixin, forms.ModelForm):
+    """Formulário para criação/edição de usuários pelo Administrador."""
+    password1 = forms.CharField(
+        label='Senha',
+        widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}),
+        required=False,
+        help_text='Deixe em branco para manter a senha atual (ao editar).',
+    )
+    password2 = forms.CharField(
+        label='Confirmar senha',
+        widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}),
+        required=False,
+    )
+
+    class Meta:
+        model = User
+        fields = ['username', 'first_name', 'last_name', 'email', 'is_active']
+
+    def clean(self):
+        cleaned = super().clean()
+        p1 = cleaned.get('password1')
+        p2 = cleaned.get('password2')
+        if p1 or p2:
+            if p1 != p2:
+                raise forms.ValidationError('As senhas não coincidem.')
+        return cleaned
 
 
 class CustomAuthenticationForm(BaseFormMixin, AuthenticationForm):
-    """Formulário de login com o mesmo estilo (Bootstrap + asterisco) dos demais."""
+    """Formulário de login com o mesmo estilo dos demais formulários."""

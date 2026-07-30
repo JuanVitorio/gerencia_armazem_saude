@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Categoria, Fornecedor, Movimentacao, Produto
+from .models import Categoria, Movimentacao, PerfilUsuario, Produto, Unidade
 
 
 @admin.register(Categoria)
@@ -10,22 +10,27 @@ class CategoriaAdmin(admin.ModelAdmin):
     search_fields = ('nome',)
 
 
-@admin.register(Fornecedor)
-class FornecedorAdmin(admin.ModelAdmin):
-    list_display = ('nome', 'cnpj_cpf', 'telefone', 'email', 'ativo')
-    list_filter = ('ativo',)
-    search_fields = ('nome', 'cnpj_cpf', 'email')
+@admin.register(Unidade)
+class UnidadeAdmin(admin.ModelAdmin):
+    list_display = ('nome', 'tipo', 'ativa', 'criado_em')
+    list_filter = ('tipo', 'ativa')
+    search_fields = ('nome',)
+
+
+@admin.register(PerfilUsuario)
+class PerfilUsuarioAdmin(admin.ModelAdmin):
+    list_display = ('usuario', 'unidade')
+    list_filter = ('unidade',)
+    search_fields = ('usuario__username', 'unidade__nome')
+    autocomplete_fields = ('usuario',)
 
 
 @admin.register(Produto)
 class ProdutoAdmin(admin.ModelAdmin):
-    list_display = (
-        'nome', 'sku', 'categoria', 'fornecedor', 'quantidade',
-        'unidade_medida', 'data_validade', 'ativo',
-    )
-    list_filter = ('categoria', 'fornecedor', 'ativo')
-    search_fields = ('nome', 'sku', 'codigo_barras', 'lote')
-    autocomplete_fields = ('categoria', 'fornecedor')
+    list_display = ('nome', 'unidade', 'categoria', 'quantidade', 'unidade_medida', 'data_validade', 'ativo')
+    list_filter = ('categoria', 'unidade', 'ativo')
+    search_fields = ('nome', 'sku', 'lote', 'detalhes')
+    autocomplete_fields = ('categoria', 'unidade')
 
 
 @admin.register(Movimentacao)

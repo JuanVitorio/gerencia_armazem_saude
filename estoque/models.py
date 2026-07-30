@@ -7,30 +7,37 @@ from django.utils import timezone
 
 class Categoria(models.Model):
     """
-    O "tipo" da categoria orienta o formulário inteligente de produtos
-    (estoque/forms.py + estoque/templates/estoque/produto_form.html):
-    dependendo do tipo escolhido aqui, alguns campos aparecem ou não no
-    cadastro de produtos dessa categoria.
+    Categorias pré-cadastradas via migration de dados.
+    O administrador pode gerenciá-las pelo Django Admin.
+    O campo 'tipo' orienta quais campos condicionais aparecem no formulário de produto.
     """
     ALIMENTO = 'ALIMENTO'
     MEDICAMENTO = 'MEDICAMENTO'
     VACINA = 'VACINA'
-    MATERIAL_ESCRITORIO = 'MATERIAL_ESCRITORIO'
+    MATERIAL_ODONTOLOGICO = 'MATERIAL_ODONTOLOGICO'
     MATERIAL_LIMPEZA = 'MATERIAL_LIMPEZA'
+    INSUMO = 'INSUMO'
     OUTRO = 'OUTRO'
+
     TIPO_CHOICES = [
         (ALIMENTO, 'Alimento'),
         (MEDICAMENTO, 'Medicamento'),
         (VACINA, 'Vacina'),
-        (MATERIAL_ESCRITORIO, 'Material de escritório'),
-        (MATERIAL_LIMPEZA, 'Material de limpeza'),
+        (MATERIAL_ODONTOLOGICO, 'Material Odontológico'),
+        (MATERIAL_LIMPEZA, 'Material de Limpeza'),
+        (INSUMO, 'Insumo'),
         (OUTRO, 'Outro'),
     ]
 
+    # Tipos que requerem campos de rastreabilidade (lote, validade)
+    TIPOS_COM_RASTREABILIDADE = {MEDICAMENTO, VACINA}
+    # Tipos que usam código/SKU
+    TIPOS_COM_SKU = {MEDICAMENTO, MATERIAL_ODONTOLOGICO}
+
     nome = models.CharField('Nome', max_length=100, unique=True)
     tipo = models.CharField(
-        'Tipo', max_length=20, choices=TIPO_CHOICES, default=OUTRO,
-        help_text='Define quais campos aparecem no cadastro de produtos desta categoria.'
+        'Tipo', max_length=30, choices=TIPO_CHOICES, default=OUTRO,
+        help_text='Controla quais campos aparecem no cadastro de produtos desta categoria.',
     )
     descricao = models.TextField('Descrição', blank=True)
     criado_em = models.DateTimeField('Criado em', auto_now_add=True)
@@ -43,29 +50,81 @@ class Categoria(models.Model):
     def __str__(self):
         return self.nome
 
-    def get_absolute_url(self):
-        return reverse('estoque:categoria_detail', args=[self.pk])
+    @property
+    def requer_rastreabilidade(self):
+        return self.tipo in self.TIPOS_COM_RASTREABILIDADE
+
+    @property
+    def usa_sku(self):
+        return self.tipo in self.TIPOS_COM_SKU
 
 
-class Fornecedor(models.Model):
-    nome = models.CharField('Nome / Razão social', max_length=150)
-    cnpj_cpf = models.CharField('CNPJ/CPF', max_length=20, blank=True)
-    telefone = models.CharField('Telefone', max_length=20, blank=True)
-    email = models.EmailField('E-mail', blank=True)
-    endereco = models.CharField('Endereço', max_length=255, blank=True)
-    ativo = models.BooleanField('Ativo', default=True)
+class Unidade(models.Model):
+    """
+    Representa um posto de saúde ou secretaria.
+    Cada unidade possui seu próprio estoque independente.
+    """
+    POSTO_SAUDE = 'POSTO_SAUDE'
+    SECRETARIA = 'SECRETARIA'
+    OUTRO = 'OUTRO'
+
+    TIPO_CHOICES = [
+        (POSTO_SAUDE, 'Posto de Saúde'),
+        (SECRETARIA, 'Secretaria'),
+        (OUTRO, 'Outro'),
+    ]
+
+    nome = models.CharField('Nome', max_length=150)
+    tipo = models.CharField('Tipo', max_length=20, choices=TIPO_CHOICES, default=POSTO_SAUDE)
+    descricao = models.TextField('Descrição', blank=True)
+    ativa = models.BooleanField('Ativa', default=True)
     criado_em = models.DateTimeField('Criado em', auto_now_add=True)
 
     class Meta:
-        verbose_name = 'Fornecedor'
-        verbose_name_plural = 'Fornecedores'
-        ordering = ['nome']
+        verbose_name = 'Unidade'
+        verbose_name_plural = 'Unidades'
+        ordering = ['tipo', 'nome']
 
     def __str__(self):
-        return self.nome
+        return f'{self.get_tipo_display()} — {self.nome}'
 
     def get_absolute_url(self):
-        return reverse('estoque:fornecedor_detail', args=[self.pk])
+        return reverse('estoque:unidade_detail', args=[self.pk])
+
+
+class PerfilUsuario(models.Model):
+    """
+    Perfil estendido do usuário Django.
+    - Se 'unidade' for None, o usuário é tratado como Administrador (acesso total).
+    - Usuários comuns só enxergam os produtos da sua unidade.
+    """
+    usuario = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='perfil',
+        verbose_name='Usuário',
+    )
+    unidade = models.ForeignKey(
+        Unidade,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='membros',
+        verbose_name='Unidade',
+        help_text='Deixe em branco para conceder acesso de Administrador (vê todas as unidades).',
+    )
+
+    class Meta:
+        verbose_name = 'Perfil de Usuário'
+        verbose_name_plural = 'Perfis de Usuários'
+
+    def __str__(self):
+        return f'Perfil de {self.usuario.username}'
+
+    @property
+    def is_admin(self):
+        """Administradores: superusuários ou perfis sem unidade vinculada."""
+        return self.usuario.is_superuser or self.usuario.is_staff or self.unidade is None
 
 
 class Produto(models.Model):
@@ -74,42 +133,66 @@ class Produto(models.Model):
         ('CX', 'Caixa'),
         ('PC', 'Pacote'),
         ('KG', 'Quilograma'),
+        ('G', 'Grama'),
         ('L', 'Litro'),
         ('ML', 'Mililitro'),
         ('DS', 'Dose'),
         ('FR', 'Frasco'),
         ('AMP', 'Ampola'),
         ('PAR', 'Par'),
+        ('RO', 'Rolo'),
+        ('SC', 'Saco'),
     ]
 
-    nome = models.CharField('Nome', max_length=150)
-    descricao = models.TextField('Descrição', blank=True)
-    sku = models.CharField(
-        'Código', max_length=50, unique=True, null=True, blank=True,
-        help_text='Nem todo item precisa de código (ex: alimentos a granel).'
+    # Relacionamentos
+    unidade = models.ForeignKey(
+        Unidade,
+        on_delete=models.CASCADE,
+        related_name='produtos',
+        verbose_name='Unidade',
+        null=True,
+        blank=True,
     )
-    codigo_barras = models.CharField('Código de barras', max_length=50, blank=True)
     categoria = models.ForeignKey(
-        Categoria, on_delete=models.SET_NULL, null=True, blank=True,
-        related_name='produtos', verbose_name='Categoria'
+        Categoria,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='produtos',
+        verbose_name='Categoria',
     )
-    fornecedor = models.ForeignKey(
-        Fornecedor, on_delete=models.SET_NULL, null=True, blank=True,
-        related_name='produtos', verbose_name='Fornecedor'
+
+    # Campos principais
+    nome = models.CharField('Nome', max_length=150)
+    detalhes = models.CharField(
+        'Detalhes',
+        max_length=255,
+        blank=True,
+        help_text='Cor, tamanho, modelo, concentração, etc. Ex: "500mg/5ml" ou "Tamanho M, azul".',
     )
-    unidade_medida = models.CharField(
-        'Unidade de medida', max_length=3, choices=UNIDADE_CHOICES, default='UN'
+    descricao = models.TextField('Descrição / Observações', blank=True)
+
+    # Identificação (campos condicionais por categoria)
+    sku = models.CharField(
+        'Código', max_length=50, blank=True,
+        help_text='Código interno ou de referência (opcional).',
     )
     lote = models.CharField(
         'Lote', max_length=50, blank=True,
-        help_text='Número do lote (comum em vacinas e medicamentos).'
+        help_text='Número do lote (vacinas e medicamentos).',
     )
     data_validade = models.DateField(
-        'Data de validade', null=True, blank=True,
-        help_text='Deixe em branco para itens sem validade (ex: materiais).'
+        'Data de Validade', null=True, blank=True,
+        help_text='Deixe em branco para itens sem prazo de validade.',
     )
-    preco_custo = models.DecimalField('Preço de custo', max_digits=10, decimal_places=2, default=0)
-    quantidade = models.PositiveIntegerField('Quantidade em estoque', default=0)
+
+    # Estoque
+    unidade_medida = models.CharField(
+        'Unidade de Medida', max_length=3, choices=UNIDADE_CHOICES, default='UN',
+    )
+    quantidade = models.PositiveIntegerField('Quantidade em Estoque', default=0)
+
+    # Controle
     ativo = models.BooleanField('Ativo', default=True)
     criado_em = models.DateTimeField('Criado em', auto_now_add=True)
     atualizado_em = models.DateTimeField('Atualizado em', auto_now=True)
@@ -120,23 +203,18 @@ class Produto(models.Model):
         ordering = ['nome']
 
     def __str__(self):
-        return f'{self.nome} ({self.sku})' if self.sku else self.nome
+        return self.nome
 
     def get_absolute_url(self):
         return reverse('estoque:produto_detail', args=[self.pk])
 
     @property
     def estoque_baixo(self):
-        """
-        Não existe mais um "estoque mínimo" configurável por produto: o
-        sistema usa um limite único (settings.LIMITE_ESTOQUE_BAIXO) para
-        manter o cadastro simples.
-        """
         return self.quantidade <= settings.LIMITE_ESTOQUE_BAIXO
 
     @property
     def dias_para_vencer(self):
-        """Retorna quantos dias faltam para o vencimento (negativo se já venceu)."""
+        """Retorna quantos dias faltam para o vencimento (negativo = já venceu)."""
         if not self.data_validade:
             return None
         return (self.data_validade - timezone.localdate()).days
@@ -151,10 +229,6 @@ class Produto(models.Model):
         dias = self.dias_para_vencer
         return dias is not None and 0 <= dias <= settings.DIAS_ALERTA_VENCIMENTO
 
-    @property
-    def valor_total_estoque(self):
-        return self.quantidade * self.preco_custo
-
 
 class Movimentacao(models.Model):
     ENTRADA = 'ENTRADA'
@@ -165,24 +239,30 @@ class Movimentacao(models.Model):
     ]
 
     produto = models.ForeignKey(
-        Produto, on_delete=models.CASCADE, related_name='movimentacoes', verbose_name='Produto'
+        Produto,
+        on_delete=models.CASCADE,
+        related_name='movimentacoes',
+        verbose_name='Produto',
     )
     tipo = models.CharField('Tipo', max_length=7, choices=TIPO_CHOICES)
     quantidade = models.PositiveIntegerField('Quantidade')
-    motivo = models.CharField('Motivo', max_length=255, blank=True)
+    motivo = models.CharField('Motivo / Observação', max_length=255, blank=True)
     usuario = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
-        verbose_name='Usuário responsável'
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name='Usuário',
     )
     data = models.DateTimeField('Data', auto_now_add=True)
 
     class Meta:
-        verbose_name = 'Movimentação de estoque'
-        verbose_name_plural = 'Movimentações de estoque'
+        verbose_name = 'Movimentação de Estoque'
+        verbose_name_plural = 'Movimentações de Estoque'
         ordering = ['-data']
 
     def __str__(self):
-        return f'{self.get_tipo_display()} de {self.quantidade} - {self.produto.nome}'
+        return f'{self.get_tipo_display()} — {self.quantidade} × {self.produto.nome}'
 
     def clean(self):
         if self.tipo == self.SAIDA and self.produto_id:
