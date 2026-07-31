@@ -17,11 +17,12 @@ from django.views.generic import (
 
 from . import relatorios
 from .forms import (
+    FuncionarioFiltroForm, FuncionarioForm, LancamentoBancoHorasForm,
     MovimentacaoFiltroForm, MovimentacaoForm,
     PerfilUsuarioForm, ProdutoFiltroForm, ProdutoForm,
     UsuarioForm,
 )
-from .models import Categoria, Movimentacao, PerfilUsuario, Produto, Unidade
+from .models import Categoria, Funcionario, LancamentoBancoHoras, Movimentacao, PerfilUsuario, Produto, Unidade
 
 
 # ---------------------------------------------------------------------------
@@ -471,6 +472,125 @@ class UsuarioUpdateView(LoginRequiredMixin, AdminRequiredMixin, View):
             'form_perfil': form_perfil,
             'object': usuario,
         })
+
+
+# ---------------------------------------------------------------------------
+# Banco de Horas (apenas Admin/RH)
+# ---------------------------------------------------------------------------
+
+class FuncionarioListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
+    """Tela principal do banco de horas: funcionários e seus saldos."""
+    model = Funcionario
+    template_name = 'estoque/funcionario_list.html'
+    context_object_name = 'funcionarios'
+
+    def get_queryset(self):
+        qs = Funcionario.objects.select_related('unidade')
+        self.filtro_form = FuncionarioFiltroForm(self.request.GET or None)
+        if self.filtro_form.is_valid():
+            termo = self.filtro_form.cleaned_data.get('q')
+            unidade = self.filtro_form.cleaned_data.get('unidade')
+            if termo:
+                qs = qs.filter(
+                    Q(nome__icontains=termo) | Q(cargo__icontains=termo) | Q(matricula__icontains=termo)
+                )
+            if unidade:
+                qs = qs.filter(unidade=unidade)
+        return qs.order_by('nome')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['filtro_form'] = self.filtro_form
+        return context
+
+
+class FuncionarioDetailView(LoginRequiredMixin, AdminRequiredMixin, DetailView):
+    model = Funcionario
+    template_name = 'estoque/funcionario_detail.html'
+    context_object_name = 'funcionario'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['lancamentos'] = self.object.lancamentos.select_related('usuario').all()[:50]
+        return context
+
+
+class FuncionarioCreateView(LoginRequiredMixin, AdminRequiredMixin, CreateView):
+    model = Funcionario
+    form_class = FuncionarioForm
+    template_name = 'estoque/funcionario_form.html'
+    success_url = reverse_lazy('estoque:funcionario_list')
+
+    def form_valid(self, form):
+        messages.success(self.request, f'Funcionário "{form.instance.nome}" cadastrado com sucesso.')
+        return super().form_valid(form)
+
+
+class FuncionarioUpdateView(LoginRequiredMixin, AdminRequiredMixin, UpdateView):
+    model = Funcionario
+    form_class = FuncionarioForm
+    template_name = 'estoque/funcionario_form.html'
+
+    def get_success_url(self):
+        return self.object.get_absolute_url()
+
+    def form_valid(self, form):
+        messages.success(self.request, 'Funcionário atualizado com sucesso.')
+        return super().form_valid(form)
+
+
+class FuncionarioDeleteView(LoginRequiredMixin, AdminRequiredMixin, DeleteView):
+    model = Funcionario
+    template_name = 'estoque/confirm_delete.html'
+    success_url = reverse_lazy('estoque:funcionario_list')
+
+    def form_valid(self, form):
+        messages.success(self.request, 'Funcionário removido com sucesso.')
+        return super().form_valid(form)
+
+
+class LancamentoBancoHorasCreateView(LoginRequiredMixin, AdminRequiredMixin, CreateView):
+    """Lançamento de crédito/débito de horas — só o gestor/RH acessa (AdminRequiredMixin)."""
+    model = LancamentoBancoHoras
+    form_class = LancamentoBancoHorasForm
+    template_name = 'estoque/lancamento_banco_horas_form.html'
+    success_url = reverse_lazy('estoque:funcionario_list')
+
+    def get_initial(self):
+        initial = super().get_initial()
+        funcionario_id = self.request.GET.get('funcionario')
+        if funcionario_id:
+            initial['funcionario'] = funcionario_id
+        return initial
+
+    def form_valid(self, form):
+        form.instance.usuario = self.request.user
+        try:
+            response = super().form_valid(form)
+        except ValidationError as exc:
+            form.add_error(None, exc)
+            return self.form_invalid(form)
+        acao = 'Crédito' if form.instance.tipo == LancamentoBancoHoras.CREDITO else 'Débito'
+        messages.success(
+            self.request,
+            f'{acao} de {form.instance.horas}h registrado para "{form.instance.funcionario.nome}".',
+        )
+        return response
+
+    def get_success_url(self):
+        return self.object.funcionario.get_absolute_url()
+
+
+class LancamentoBancoHorasDeleteView(LoginRequiredMixin, AdminRequiredMixin, DeleteView):
+    model = LancamentoBancoHoras
+    template_name = 'estoque/confirm_delete.html'
+
+    def get_success_url(self):
+        return reverse('estoque:funcionario_detail', args=[self.object.funcionario_id])
+
+    def form_valid(self, form):
+        messages.success(self.request, 'Lançamento removido com sucesso.')
+        return super().form_valid(form)
 
 
 # ---------------------------------------------------------------------------

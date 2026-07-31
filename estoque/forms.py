@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 
-from .models import Categoria, Movimentacao, PerfilUsuario, Produto, Unidade
+from .models import Categoria, Funcionario, LancamentoBancoHoras, Movimentacao, PerfilUsuario, Produto, Unidade
 
 
 class BaseFormMixin:
@@ -177,3 +177,50 @@ class UsuarioForm(BaseFormMixin, forms.ModelForm):
 
 class CustomAuthenticationForm(BaseFormMixin, AuthenticationForm):
     """Formulário de login com o mesmo estilo dos demais formulários."""
+
+
+class FuncionarioForm(BaseFormMixin, forms.ModelForm):
+    class Meta:
+        model = Funcionario
+        fields = ['nome', 'cargo', 'matricula', 'unidade', 'ativo']
+        widgets = {
+            'nome': forms.TextInput(attrs={'autofocus': True, 'placeholder': 'Nome completo'}),
+            'cargo': forms.TextInput(attrs={'placeholder': 'Ex: Auxiliar de enfermagem'}),
+            'matricula': forms.TextInput(attrs={'placeholder': 'Número de matrícula (opcional)'}),
+        }
+
+
+class LancamentoBancoHorasForm(BaseFormMixin, forms.ModelForm):
+    class Meta:
+        model = LancamentoBancoHoras
+        fields = ['funcionario', 'tipo', 'horas', 'data_referencia', 'motivo']
+        widgets = {
+            'data_referencia': forms.DateInput(attrs={'type': 'date'}),
+            'horas': forms.NumberInput(attrs={'step': '0.25', 'min': '0.25', 'placeholder': 'Ex: 2 ou 1.5'}),
+            'motivo': forms.TextInput(attrs={'placeholder': 'Ex: Hora extra no plantão, folga compensatória...'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['funcionario'].queryset = Funcionario.objects.filter(ativo=True).order_by('nome')
+
+    def clean_horas(self):
+        horas = self.cleaned_data.get('horas')
+        if not horas or horas <= 0:
+            raise forms.ValidationError('A quantidade de horas deve ser maior que zero.')
+        return horas
+
+
+class FuncionarioFiltroForm(forms.Form):
+    q = forms.CharField(
+        label='Buscar', required=False,
+        widget=forms.TextInput(attrs={
+            'placeholder': 'Nome, cargo, matrícula...',
+            'class': 'form-control',
+        }),
+    )
+    unidade = forms.ModelChoiceField(
+        label='Unidade', queryset=Unidade.objects.all(), required=False,
+        empty_label='Todas as unidades',
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )

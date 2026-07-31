@@ -283,3 +283,87 @@ class Movimentacao(models.Model):
                     self.produto.quantidade -= self.quantidade
                 self.produto.save(update_fields=['quantidade', 'atualizado_em'])
             super().save(*args, **kwargs)
+
+
+# ---------------------------------------------------------------------------
+# Banco de Horas
+# ---------------------------------------------------------------------------
+
+class Funcionario(models.Model):
+    """
+    Cadastro de funcionário para o banco de horas. Não tem login no
+    sistema — é só um registro administrativo, gerenciado pelo
+    gestor/RH (mesma permissão de Unidade/Usuário, ver AdminRequiredMixin).
+    """
+    nome = models.CharField('Nome', max_length=150)
+    cargo = models.CharField('Cargo / Função', max_length=100, blank=True)
+    matricula = models.CharField('Matrícula', max_length=30, blank=True)
+    unidade = models.ForeignKey(
+        Unidade, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='funcionarios', verbose_name='Unidade',
+    )
+    ativo = models.BooleanField('Ativo', default=True)
+    criado_em = models.DateTimeField('Criado em', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Funcionário'
+        verbose_name_plural = 'Funcionários'
+        ordering = ['nome']
+
+    def __str__(self):
+        return self.nome
+
+    def get_absolute_url(self):
+        return reverse('estoque:funcionario_detail', args=[self.pk])
+
+    @property
+    def saldo_horas(self):
+        """Créditos (horas extras) menos débitos (horas compensadas/folgas)."""
+        agregados = self.lancamentos.aggregate(
+            creditos=models.Sum('horas', filter=models.Q(tipo=LancamentoBancoHoras.CREDITO)),
+            debitos=models.Sum('horas', filter=models.Q(tipo=LancamentoBancoHoras.DEBITO)),
+        )
+        creditos = agregados['creditos'] or 0
+        debitos = agregados['debitos'] or 0
+        return creditos - debitos
+
+
+class LancamentoBancoHoras(models.Model):
+    """
+    Cada lançamento é um crédito (horas extras trabalhadas) ou débito
+    (horas compensadas/folga) para um funcionário. O saldo é sempre
+    calculado a partir do histórico (Funcionario.saldo_horas), então
+    corrigir ou excluir um lançamento sempre mantém o saldo consistente.
+    """
+    CREDITO = 'CREDITO'
+    DEBITO = 'DEBITO'
+    TIPO_CHOICES = [
+        (CREDITO, 'Crédito (horas trabalhadas/extras)'),
+        (DEBITO, 'Débito (horas compensadas/folga)'),
+    ]
+
+    funcionario = models.ForeignKey(
+        Funcionario, on_delete=models.CASCADE, related_name='lancamentos', verbose_name='Funcionário',
+    )
+    tipo = models.CharField('Tipo', max_length=7, choices=TIPO_CHOICES)
+    horas = models.DecimalField('Horas', max_digits=5, decimal_places=2)
+    data_referencia = models.DateField('Data de referência', default=timezone.localdate)
+    motivo = models.CharField('Motivo / Observação', max_length=255, blank=True)
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='lancamentos_banco_horas', verbose_name='Registrado por',
+    )
+    criado_em = models.DateTimeField('Criado em', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Lançamento de Banco de Horas'
+        verbose_name_plural = 'Lançamentos de Banco de Horas'
+        ordering = ['-data_referencia', '-criado_em']
+
+    def __str__(self):
+        sinal = '+' if self.tipo == self.CREDITO else '-'
+        return f'{sinal}{self.horas}h — {self.funcionario.nome} ({self.data_referencia:%d/%m/%Y})'
+
+    def clean(self):
+        if self.horas is not None and self.horas <= 0:
+            raise ValidationError('A quantidade de horas deve ser maior que zero.')

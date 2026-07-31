@@ -31,6 +31,15 @@ urlpatterns = [
     path('usuarios/novo/', views.UsuarioCreateView.as_view(), name='usuario_create'),
     path('usuarios/<int:pk>/editar/', views.UsuarioUpdateView.as_view(), name='usuario_update'),
 
+    # Banco de Horas (admin/RH only)
+    path('banco-de-horas/', views.FuncionarioListView.as_view(), name='funcionario_list'),
+    path('banco-de-horas/novo/', views.FuncionarioCreateView.as_view(), name='funcionario_create'),
+    path('banco-de-horas/<int:pk>/', views.FuncionarioDetailView.as_view(), name='funcionario_detail'),
+    path('banco-de-horas/<int:pk>/editar/', views.FuncionarioUpdateView.as_view(), name='funcionario_update'),
+    path('banco-de-horas/<int:pk>/excluir/', views.FuncionarioDeleteView.as_view(), name='funcionario_delete'),
+    path('banco-de-horas/lancamento/novo/', views.LancamentoBancoHorasCreateView.as_view(), name='lancamento_create'),
+    path('banco-de-horas/lancamento/<int:pk>/excluir/', views.LancamentoBancoHorasDeleteView.as_view(), name='lancamento_delete'),
+
     # Relatórios
     path('relatorios/', views.RelatorioListView.as_view(), name='relatorio_list'),
     path('relatorios/gerar/<str:tipo>/', views.RelatorioGerarView.as_view(), name='relatorio_gerar'),

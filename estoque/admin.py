@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Categoria, Movimentacao, PerfilUsuario, Produto, Unidade
+from .models import Categoria, Funcionario, LancamentoBancoHoras, Movimentacao, PerfilUsuario, Produto, Unidade
 
 
 @admin.register(Categoria)
@@ -40,3 +40,20 @@ class MovimentacaoAdmin(admin.ModelAdmin):
     search_fields = ('produto__nome', 'produto__sku')
     autocomplete_fields = ('produto',)
     readonly_fields = ('data',)
+
+
+@admin.register(Funcionario)
+class FuncionarioAdmin(admin.ModelAdmin):
+    list_display = ('nome', 'cargo', 'matricula', 'unidade', 'ativo', 'saldo_horas')
+    list_filter = ('unidade', 'ativo')
+    search_fields = ('nome', 'cargo', 'matricula')
+    autocomplete_fields = ('unidade',)
+
+
+@admin.register(LancamentoBancoHoras)
+class LancamentoBancoHorasAdmin(admin.ModelAdmin):
+    list_display = ('funcionario', 'tipo', 'horas', 'data_referencia', 'usuario', 'criado_em')
+    list_filter = ('tipo', 'data_referencia')
+    search_fields = ('funcionario__nome', 'motivo')
+    autocomplete_fields = ('funcionario',)
+    readonly_fields = ('criado_em',)
