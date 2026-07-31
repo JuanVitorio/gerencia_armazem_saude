@@ -1,0 +1,122 @@
+{% extends 'estoque/base.html' %}
+{% block title %}Banco de Horas — Gestão de Estoque{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title"><i class="bi bi-clock-history text-primary"></i> Banco de Horas</h1>
+            <p class="page-subtitle">Saldo de horas extras e compensadas por funcionário.</p>
+        </div>
+        <div class="page-actions">
+            <a href="{% url 'estoque:lancamento_create' %}" class="btn btn-success btn-sm" id="btn-lancar-horas">
+                <i class="bi bi-plus-slash-minus"></i> Lançar Horas
+            </a>
+            <a href="{% url 'estoque:funcionario_create' %}" class="btn btn-primary btn-sm" id="btn-novo-funcionario">
+                <i class="bi bi-person-plus"></i> Novo Funcionário
+            </a>
+        </div>
+    </div>
+
+    <div class="filter-bar">
+        <form method="get" class="filter-form" id="form-filtro-funcionarios">
+            <div class="filter-field filter-field-grow">
+                <i class="bi bi-search filter-icon"></i>
+                {{ filtro_form.q }}
+            </div>
+            <div class="filter-field">
+                {{ filtro_form.unidade }}
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm" id="btn-filtrar">
+                <i class="bi bi-filter"></i> Filtrar
+            </button>
+            {% if request.GET %}
+            <a href="{% url 'estoque:funcionario_list' %}" class="btn btn-outline-secondary btn-sm" title="Limpar filtros">
+                <i class="bi bi-x-lg"></i>
+            </a>
+            {% endif %}
+        </form>
+    </div>
+
+    <div class="table-card">
+        <div class="table-responsive">
+            <table class="data-table" id="tabela-funcionarios">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Cargo</th>
+                        <th>Unidade</th>
+                        <th class="text-end">Saldo</th>
+                        <th>Status</th>
+                        <th class="text-end">Opções</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for funcionario in funcionarios %}
+                    <tr>
+                        <td>
+                            <a href="{{ funcionario.get_absolute_url }}" class="item-link-dark">
+                                {{ funcionario.nome }}
+                            </a>
+                            {% if funcionario.matricula %}
+                                <div class="text-muted small">Mat. {{ funcionario.matricula }}</div>
+                            {% endif %}
+                        </td>
+                        <td>{{ funcionario.cargo|default:'—' }}</td>
+                        <td>
+                            {% if funcionario.unidade %}
+                                <span class="cat-tag"><i class="bi bi-building"></i> {{ funcionario.unidade.nome }}</span>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            {% if funcionario.saldo_horas > 0 %}
+                                <span class="qty-badge">+{{ funcionario.saldo_horas }}h</span>
+                            {% elif funcionario.saldo_horas < 0 %}
+                                <span class="qty-badge qty-badge-danger">{{ funcionario.saldo_horas }}h</span>
+                            {% else %}
+                                <span class="text-muted">0h</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if funcionario.ativo %}
+                                <span class="status-tag status-success">Ativo</span>
+                            {% else %}
+                                <span class="status-tag status-muted">Inativo</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <div class="btn-group-compact">
+                                <a href="{% url 'estoque:lancamento_create' %}?funcionario={{ funcionario.pk }}"
+                                   class="btn-icon" title="Lançar horas">
+                                    <i class="bi bi-plus-slash-minus"></i>
+                                </a>
+                                <a href="{{ funcionario.get_absolute_url }}" class="btn-icon" title="Ver">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a href="{% url 'estoque:funcionario_update' funcionario.pk %}" class="btn-icon" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state-inline">
+                                <i class="bi bi-clock-history text-muted"></i>
+                                <p>Nenhum funcionário cadastrado.</p>
+                                <a href="{% url 'estoque:funcionario_create' %}" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-plus-lg"></i> Cadastrar Primeiro Funcionário
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

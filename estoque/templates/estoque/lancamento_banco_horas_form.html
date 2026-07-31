@@ -1,0 +1,93 @@
+{% extends 'estoque/base.html' %}
+{% block title %}Lançar Horas — Gestão de Estoque{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">
+                <i class="bi bi-plus-slash-minus text-primary"></i> Lançar Horas
+            </h1>
+            <p class="page-subtitle">Registre um crédito (hora extra) ou débito (compensação/folga) no banco de horas.</p>
+        </div>
+        <a href="{% url 'estoque:funcionario_list' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Voltar
+        </a>
+    </div>
+
+    <div class="form-card" style="max-width: 640px;">
+        <form method="post" novalidate id="form-lancamento">
+            {% csrf_token %}
+
+            {% for error in form.non_field_errors %}
+            <div class="alert-inline alert-inline-danger">
+                <i class="bi bi-exclamation-octagon-fill"></i> {{ error }}
+            </div>
+            {% endfor %}
+
+            <div class="form-row">
+                <div class="form-col-full">
+                    <label for="{{ form.funcionario.id_for_label }}" class="form-label-compact">
+                        Funcionário <span class="req">*</span>
+                    </label>
+                    {{ form.funcionario }}
+                    {% for e in form.funcionario.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-col-sm">
+                    <label class="form-label-compact">Tipo <span class="req">*</span></label>
+                    <div class="tipo-btn-group">
+                        <label class="tipo-btn tipo-btn-entrada">
+                            <input type="radio" name="tipo" value="CREDITO"
+                                   {% if form.tipo.value == 'CREDITO' or not form.tipo.value %}checked{% endif %}>
+                            <i class="bi bi-plus-lg"></i> Crédito
+                        </label>
+                        <label class="tipo-btn tipo-btn-saida">
+                            <input type="radio" name="tipo" value="DEBITO"
+                                   {% if form.tipo.value == 'DEBITO' %}checked{% endif %}>
+                            <i class="bi bi-dash-lg"></i> Débito
+                        </label>
+                    </div>
+                    {% for e in form.tipo.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="form-col-sm">
+                    <label for="{{ form.horas.id_for_label }}" class="form-label-compact">
+                        Horas <span class="req">*</span>
+                    </label>
+                    {{ form.horas }}
+                    {% for e in form.horas.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-col-full">
+                    <label for="{{ form.data_referencia.id_for_label }}" class="form-label-compact">
+                        Data de referência <span class="req">*</span>
+                    </label>
+                    {{ form.data_referencia }}
+                    {% for e in form.data_referencia.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-col-full">
+                    <label for="{{ form.motivo.id_for_label }}" class="form-label-compact">
+                        Motivo / Observação <span class="form-hint">(opcional)</span>
+                    </label>
+                    {{ form.motivo }}
+                    {% for e in form.motivo.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-success">
+                    <i class="bi bi-check-circle-fill"></i> Confirmar e Registrar
+                </button>
+                <a href="{% url 'estoque:funcionario_list' %}" class="btn btn-outline-secondary">Cancelar</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -52,6 +52,10 @@
                href="{% url 'estoque:usuario_list' %}" title="Gerenciar Usuários">
                 <i class="bi bi-people"></i> Usuários
             </a>
+            <a class="nav-link nav-link-admin {% if 'funcionario' in request.resolver_match.url_name or 'lancamento' in request.resolver_match.url_name %}active{% endif %}"
+               href="{% url 'estoque:funcionario_list' %}" title="Banco de Horas">
+                <i class="bi bi-clock-history"></i> Banco de Horas
+            </a>
             {% elif user.perfil and user.perfil.is_admin %}
             <div class="nav-separator"></div>
             <a class="nav-link nav-link-admin {% if 'unidade' in request.resolver_match.url_name %}active{% endif %}"
@@ -61,6 +65,10 @@
             <a class="nav-link nav-link-admin {% if 'usuario' in request.resolver_match.url_name %}active{% endif %}"
                href="{% url 'estoque:usuario_list' %}">
                 <i class="bi bi-people"></i> Usuários
+            </a>
+            <a class="nav-link nav-link-admin {% if 'funcionario' in request.resolver_match.url_name or 'lancamento' in request.resolver_match.url_name %}active{% endif %}"
+               href="{% url 'estoque:funcionario_list' %}">
+                <i class="bi bi-clock-history"></i> Banco de Horas
             </a>
             {% endif %}
         </div>
@@ -146,6 +154,9 @@
             </a>
             <a class="nav-link-mobile" href="{% url 'estoque:usuario_list' %}">
                 <i class="bi bi-people"></i> Usuários
+            </a>
+            <a class="nav-link-mobile" href="{% url 'estoque:funcionario_list' %}">
+                <i class="bi bi-clock-history"></i> Banco de Horas
             </a>
             {% endif %}
         </nav>

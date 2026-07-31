@@ -1,0 +1,115 @@
+{% extends 'estoque/base.html' %}
+{% load humanize %}
+{% block title %}{{ funcionario.nome }} — Banco de Horas{% endblock %}
+
+{% block content %}
+<div class="page-container">
+
+    <div class="page-header">
+        <div>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <h1 class="page-title mb-0">{{ funcionario.nome }}</h1>
+                {% if funcionario.ativo %}
+                    <span class="status-tag status-success">Ativo</span>
+                {% else %}
+                    <span class="status-tag status-muted">Inativo</span>
+                {% endif %}
+            </div>
+            {% if funcionario.cargo %}
+            <p class="page-subtitle">{{ funcionario.cargo }}</p>
+            {% endif %}
+        </div>
+        <div class="page-actions">
+            <a href="{% url 'estoque:lancamento_create' %}?funcionario={{ funcionario.pk }}"
+               class="btn btn-success btn-sm" id="btn-lancar-horas-detalhe">
+                <i class="bi bi-plus-slash-minus"></i> Lançar Horas
+            </a>
+            <a href="{% url 'estoque:funcionario_update' funcionario.pk %}"
+               class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-pencil-square"></i> Editar
+            </a>
+            <a href="{% url 'estoque:funcionario_list' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Voltar
+            </a>
+        </div>
+    </div>
+
+    <!-- Saldo -->
+    <div class="detail-stats">
+        <div class="detail-stat {% if funcionario.saldo_horas < 0 %}detail-stat-danger{% endif %}">
+            <span class="detail-stat-label">Saldo Atual</span>
+            <span class="detail-stat-value">{{ funcionario.saldo_horas }}</span>
+            <span class="detail-stat-unit">horas</span>
+        </div>
+        <div class="detail-stat">
+            <span class="detail-stat-label">Matrícula</span>
+            <span class="detail-stat-value" style="font-size: 1.1rem;">{{ funcionario.matricula|default:'—' }}</span>
+        </div>
+        <div class="detail-stat">
+            <span class="detail-stat-label">Unidade</span>
+            <span class="detail-stat-value" style="font-size: 1.1rem;">{{ funcionario.unidade|default:'—' }}</span>
+        </div>
+    </div>
+
+    <!-- Histórico de Lançamentos -->
+    <div class="table-card">
+        <div class="table-card-header">
+            <h2 class="table-card-title">
+                <i class="bi bi-clock-history text-primary me-1"></i> Histórico de Lançamentos
+            </h2>
+            <a href="{% url 'estoque:lancamento_create' %}?funcionario={{ funcionario.pk }}"
+               class="btn btn-success btn-sm">
+                <i class="bi bi-plus-lg"></i> Novo Lançamento
+            </a>
+        </div>
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Tipo</th>
+                        <th>Horas</th>
+                        <th>Data de referência</th>
+                        <th>Motivo / Observação</th>
+                        <th>Registrado por</th>
+                        <th class="text-end">Opções</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for lanc in lancamentos %}
+                    <tr>
+                        <td>
+                            {% if lanc.tipo == 'CREDITO' %}
+                                <span class="mov-badge mov-entrada"><i class="bi bi-plus-lg"></i> Crédito</span>
+                            {% else %}
+                                <span class="mov-badge mov-saida"><i class="bi bi-dash-lg"></i> Débito</span>
+                            {% endif %}
+                        </td>
+                        <td class="fw-bold">{{ lanc.horas }}h</td>
+                        <td>{{ lanc.data_referencia|date:'d/m/Y' }}</td>
+                        <td class="text-muted small">{{ lanc.motivo|default:'—' }}</td>
+                        <td class="small"><i class="bi bi-person me-1"></i>{{ lanc.usuario|default:'—' }}</td>
+                        <td class="text-end">
+                            <div class="btn-group-compact">
+                                <a href="{% url 'estoque:lancamento_delete' lanc.pk %}" class="btn-icon" title="Excluir">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state-inline">
+                                <i class="bi bi-clock text-muted"></i>
+                                <p>Nenhum lançamento registrado para este funcionário.</p>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
