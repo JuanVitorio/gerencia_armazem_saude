@@ -25,6 +25,8 @@ urlpatterns = [
     # Movimentações
     path('movimentacoes/', views.MovimentacaoListView.as_view(), name='movimentacao_list'),
     path('movimentacoes/nova/', views.MovimentacaoCreateView.as_view(), name='movimentacao_create'),
+    path('movimentacoes/<int:pk>/', views.MovimentacaoDetailView.as_view(), name='movimentacao_detail'),
+    path('movimentacoes/<int:pk>/excluir/', views.MovimentacaoDeleteView.as_view(), name='movimentacao_delete'),
 
     # Usuários (admin only)
     path('usuarios/', views.UsuarioListView.as_view(), name='usuario_list'),

@@ -40,6 +40,21 @@ class Categoria(models.Model):
         help_text='Controla quais campos aparecem no cadastro de produtos desta categoria.',
     )
     descricao = models.TextField('Descrição', blank=True)
+
+    # --------------------------------------------------------------------
+    # Regra dinâmica de estoque baixo (parametrizável) — ver comentário
+    # completo em Produto.estoque_baixo / Produto.limite_estoque_baixo_calculado.
+    # Pendente de validação de negócio antes de virar o padrão do sistema.
+    # --------------------------------------------------------------------
+    limite_estoque_baixo = models.PositiveIntegerField(
+        'Limite de Estoque Baixo (categoria)', null=True, blank=True,
+        help_text=(
+            'Quantidade abaixo da qual produtos desta categoria entram no alerta '
+            'de estoque baixo. Deixe em branco para usar o limite padrão do sistema. '
+            'Um produto pode sobrescrever esse valor individualmente.'
+        ),
+    )
+
     criado_em = models.DateTimeField('Criado em', auto_now_add=True)
 
     class Meta:
@@ -192,6 +207,31 @@ class Produto(models.Model):
     )
     quantidade = models.PositiveIntegerField('Quantidade em Estoque', default=0)
 
+    # --------------------------------------------------------------------
+    # Regra dinâmica de estoque baixo (parametrizável) — ver comentário
+    # completo em Produto.limite_estoque_baixo_calculado, mais abaixo.
+    # Pendente de validação de negócio antes de virar o padrão do sistema.
+    # --------------------------------------------------------------------
+    limite_estoque_baixo = models.PositiveIntegerField(
+        'Limite de Estoque Baixo (produto)', null=True, blank=True,
+        help_text=(
+            'Sobrescreve o limite da categoria/sistema só para este produto. '
+            'Tem prioridade sobre tudo. Deixe em branco para não sobrescrever.'
+        ),
+    )
+    estoque_maximo = models.PositiveIntegerField(
+        'Estoque Máximo / Ideal', null=True, blank=True,
+        help_text='Capacidade ideal deste produto — usada como referência do alerta por percentual, abaixo.',
+    )
+    percentual_alerta_estoque = models.PositiveSmallIntegerField(
+        '% Mínimo do Estoque Máximo', null=True, blank=True,
+        help_text=(
+            'Alerta quando a quantidade atual cair abaixo desse percentual do '
+            '"Estoque Máximo / Ideal". Só funciona se os dois campos estiverem preenchidos. '
+            'Ex: Estoque Máximo = 100 e 20% → alerta abaixo de 20 unidades.'
+        ),
+    )
+
     # Controle
     ativo = models.BooleanField('Ativo', default=True)
     criado_em = models.DateTimeField('Criado em', auto_now_add=True)
@@ -209,8 +249,61 @@ class Produto(models.Model):
         return reverse('estoque:produto_detail', args=[self.pk])
 
     @property
+    def limite_estoque_baixo_calculado(self):
+        """
+        Regra DINÂMICA e parametrizável de estoque baixo — implementada a
+        pedido para substituir o limite único e global que existia antes
+        (settings.LIMITE_ESTOQUE_BAIXO). Código comentado/documentado em
+        detalhe abaixo para validação de negócio antes de virar padrão.
+
+        Ordem de prioridade (do mais específico para o mais genérico):
+
+          1) LIMITE POR PRODUTO — Produto.limite_estoque_baixo, se preenchido.
+             É o override mais específico possível: serve para um item que
+             realmente precisa de uma regra diferente de tudo o mais
+             (ex: uma vacina que só pode ficar com 2 doses de folga).
+
+          2) LIMITE POR PERCENTUAL — se Produto.percentual_alerta_estoque E
+             Produto.estoque_maximo estiverem preenchidos, calcula
+             `estoque_maximo * percentual / 100` (arredondado para baixo).
+             Útil pra produtos com capacidade/estoque ideal conhecido, onde
+             o alerta faz mais sentido em proporção do que em número fixo
+             (ex: alertar quando cair abaixo de 20% da capacidade do posto).
+
+          3) LIMITE POR CATEGORIA — Categoria.limite_estoque_baixo, se a
+             categoria do produto tiver um valor definido. Permite alertar
+             "Medicamentos" com um limite e "Material de Limpeza" com outro,
+             sem precisar configurar produto por produto.
+
+          4) LIMITE GLOBAL (fallback) — settings.LIMITE_ESTOQUE_BAIXO, o
+             comportamento padrão atual do sistema, usado quando nenhuma das
+             regras acima está configurada.
+
+        # TODO (validação posterior): confirmar com o time se a ordem de
+        # prioridade acima é a esperada, e se o arredondamento do cálculo
+        # por percentual deve ser para baixo (atual), para cima, ou para o
+        # inteiro mais próximo.
+        """
+        if self.limite_estoque_baixo is not None:
+            return self.limite_estoque_baixo
+
+        if self.percentual_alerta_estoque is not None and self.estoque_maximo:
+            return int(self.estoque_maximo * self.percentual_alerta_estoque / 100)
+
+        if self.categoria_id and self.categoria.limite_estoque_baixo is not None:
+            return self.categoria.limite_estoque_baixo
+
+        return settings.LIMITE_ESTOQUE_BAIXO
+
+    @property
     def estoque_baixo(self):
-        return self.quantidade <= settings.LIMITE_ESTOQUE_BAIXO
+        # Antes: comparava direto com settings.LIMITE_ESTOQUE_BAIXO (limite
+        # único e global). Agora delega para limite_estoque_baixo_calculado,
+        # que é dinâmico e parametrizável por produto, percentual ou
+        # categoria (ver docstring acima) — com o limite global como
+        # fallback, então o comportamento antigo continua funcionando pra
+        # quem não configurar nada de novo.
+        return self.quantidade <= self.limite_estoque_baixo_calculado
 
     @property
     def dias_para_vencer(self):

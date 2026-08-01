@@ -5,7 +5,7 @@ from .models import Categoria, EventoFolga, Funcionario, LancamentoFolga, Movime
 
 @admin.register(Categoria)
 class CategoriaAdmin(admin.ModelAdmin):
-    list_display = ('nome', 'tipo', 'criado_em')
+    list_display = ('nome', 'tipo', 'limite_estoque_baixo', 'criado_em')
     list_filter = ('tipo',)
     search_fields = ('nome',)
 
@@ -27,10 +27,34 @@ class PerfilUsuarioAdmin(admin.ModelAdmin):
 
 @admin.register(Produto)
 class ProdutoAdmin(admin.ModelAdmin):
-    list_display = ('nome', 'unidade', 'categoria', 'quantidade', 'unidade_medida', 'data_validade', 'ativo')
+    list_display = (
+        'nome', 'unidade', 'categoria', 'quantidade', 'unidade_medida',
+        'limite_estoque_baixo_calculado', 'data_validade', 'ativo',
+    )
     list_filter = ('categoria', 'unidade', 'ativo')
     search_fields = ('nome', 'sku', 'lote', 'detalhes')
     autocomplete_fields = ('categoria', 'unidade')
+    fieldsets = (
+        (None, {
+            'fields': (
+                'unidade', 'categoria', 'nome', 'detalhes', 'descricao',
+                'sku', 'lote', 'data_validade', 'unidade_medida', 'quantidade', 'ativo',
+            ),
+        }),
+        ('Regra de estoque baixo (parametrizável — pendente de validação)', {
+            'classes': ('collapse',),
+            'fields': ('limite_estoque_baixo', 'estoque_maximo', 'percentual_alerta_estoque'),
+            'description': (
+                'Deixe tudo em branco para usar o limite padrão do sistema ou o limite '
+                'da categoria. Veja Produto.limite_estoque_baixo_calculado em models.py '
+                'para a ordem de prioridade entre esses campos.'
+            ),
+        }),
+    )
+
+    @admin.display(description='Limite Baixo (calculado)')
+    def limite_estoque_baixo_calculado(self, obj):
+        return obj.limite_estoque_baixo_calculado
 
 
 @admin.register(Movimentacao)

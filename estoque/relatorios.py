@@ -202,12 +202,14 @@ def relatorio_estoque_atual(unidade=None):
 
 
 def relatorio_estoque_baixo(unidade=None):
-    qs = Produto.objects.filter(
-        ativo=True, quantidade__lte=settings.LIMITE_ESTOQUE_BAIXO
-    ).select_related('categoria', 'unidade').order_by('quantidade')
-    
+    # Mesma regra dinâmica/parametrizável do dashboard (ver
+    # Produto.limite_estoque_baixo_calculado em models.py) — cada produto
+    # pode ter um limite diferente (por produto, percentual ou categoria),
+    # então filtramos em Python em vez de um único `.filter()` no banco.
+    qs = Produto.objects.filter(ativo=True).select_related('categoria', 'unidade').order_by('nome')
     if unidade:
         qs = qs.filter(unidade=unidade)
+    produtos_baixo = sorted((p for p in qs if p.estoque_baixo), key=lambda p: p.quantidade)
 
     sub = f"Unidade: {unidade.nome}" if unidade else "Todas as Unidades"
 
@@ -215,12 +217,12 @@ def relatorio_estoque_baixo(unidade=None):
     widths = [7.0 * cm, 4.0 * cm, 2.5 * cm, 2.5 * cm, 2.0 * cm]
 
     rows = [header]
-    for p in qs:
+    for p in produtos_baixo:
         cat_str = p.categoria.nome if p.categoria else "—"
         qtd_str = f"<b>{p.quantidade}</b> {p.get_unidade_medida_display()}"
-        rows.append([p.nome, cat_str, qtd_str, f"{settings.LIMITE_ESTOQUE_BAIXO} un.", "<font color='#DC2626'>CRÍTICO</font>"])
+        rows.append([p.nome, cat_str, qtd_str, f"{p.limite_estoque_baixo_calculado} un.", "<font color='#DC2626'>CRÍTICO</font>"])
 
-    resumo = f"Total de produtos em estoque baixo (<= {settings.LIMITE_ESTOQUE_BAIXO} un): <b>{len(rows)-1}</b>"
+    resumo = f"Total de produtos em estoque baixo: <b>{len(produtos_baixo)}</b>"
     return _criar_pdf_base("Relatório de Produtos com Estoque Baixo", sub, rows, widths, resumo)
 
 

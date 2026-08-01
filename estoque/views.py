@@ -66,6 +66,18 @@ def filtrar_produtos_por_usuario(user, queryset=None):
     return queryset
 
 
+def filtrar_movimentacoes_por_usuario(user, queryset=None):
+    """Filtra o queryset de Movimentacao pela unidade do usuário (via produto__unidade)."""
+    if queryset is None:
+        queryset = Movimentacao.objects.select_related(
+            'produto', 'produto__categoria', 'produto__unidade', 'usuario',
+        )
+    unidade = get_unidade_do_usuario(user)
+    if unidade is not None:
+        queryset = queryset.filter(produto__unidade=unidade)
+    return queryset
+
+
 def aplicar_filtro_produtos(queryset, filtro_form):
     """
     Aplica os filtros de busca/categoria/situação de um ProdutoFiltroForm
@@ -87,7 +99,13 @@ def aplicar_filtro_produtos(queryset, filtro_form):
         queryset = queryset.filter(categoria=categoria)
     hoje = timezone.localdate()
     if situacao == 'BAIXO':
-        queryset = queryset.filter(quantidade__lte=settings.LIMITE_ESTOQUE_BAIXO)
+        # Mesma regra dinâmica/parametrizável do dashboard (ver
+        # Produto.limite_estoque_baixo_calculado em models.py) — precisa ser
+        # avaliada em Python porque o limite pode variar por produto/
+        # categoria/percentual, então não dá pra fazer com um único
+        # `.filter()` no banco. Mantido consistente de propósito: é para
+        # onde o contador "Estoque Baixo" do dashboard linka.
+        queryset = [p for p in queryset if p.estoque_baixo]
     elif situacao == 'VENCIDO':
         queryset = queryset.filter(data_validade__isnull=False, data_validade__lt=hoje)
     elif situacao == 'VENCENDO':
@@ -116,9 +134,24 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             Produto.objects.filter(ativo=True).select_related('categoria', 'unidade'),
         )
 
-        # TODO: revisar se o card de "Estoque Baixo" no dashboard é realmente
-        # necessário. Comentado por enquanto a pedido — não excluir, só reavaliar.
-        # estoque_baixo = produtos.filter(quantidade__lte=settings.LIMITE_ESTOQUE_BAIXO)
+        # --------------------------------------------------------------------
+        # Estoque baixo — regra ATUALIZADA para ser dinâmica e parametrizável
+        # por produto, percentual ou categoria (antes era um limite único e
+        # global). A lógica de resolução do limite fica em
+        # Produto.limite_estoque_baixo_calculado (models.py), bem comentada
+        # ali para facilitar a validação de negócio; aqui só consumimos a
+        # property `estoque_baixo`, que já aplica essa regra.
+        #
+        # Por depender de campos por produto/categoria (não dá pra resolver
+        # com um único `.filter()` no banco de forma simples), o filtro é
+        # feito em Python sobre o queryset já restrito à unidade do usuário
+        # — no volume de produtos de um posto/secretaria isso é barato.
+        # TODO (validação posterior): se o catálogo crescer muito, considerar
+        # mover esse cálculo para o banco (ex: anotar limite via Case/When).
+        # --------------------------------------------------------------------
+        produtos_com_estoque_baixo = [p for p in produtos if p.estoque_baixo]
+        produtos_com_estoque_baixo.sort(key=lambda p: p.quantidade)
+
         validade_alerta = produtos.filter(
             data_validade__isnull=False,
             data_validade__lte=limite_validade,
@@ -132,12 +165,12 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         context.update({
             'total_produtos': produtos.count(),
-            # 'total_estoque_baixo': estoque_baixo.count(),
+            'total_estoque_baixo': len(produtos_com_estoque_baixo),
             'total_vencidos': produtos.filter(
                 data_validade__isnull=False,
                 data_validade__lt=hoje,
             ).count(),
-            # 'produtos_estoque_baixo': estoque_baixo.order_by('quantidade')[:10],
+            'produtos_estoque_baixo': produtos_com_estoque_baixo[:10],
             'produtos_validade': validade_alerta[:10],
             'ultimas_movimentacoes': movs_qs[:10],
             'unidade_atual': unidade,
@@ -369,10 +402,7 @@ class MovimentacaoListView(LoginRequiredMixin, ListView):
     paginate_by = 40
 
     def get_queryset(self):
-        qs = Movimentacao.objects.select_related('produto', 'produto__categoria', 'usuario')
-        unidade = get_unidade_do_usuario(self.request.user)
-        if unidade is not None:
-            qs = qs.filter(produto__unidade=unidade)
+        qs = filtrar_movimentacoes_por_usuario(self.request.user)
 
         self.filtro_form = MovimentacaoFiltroForm(self.request.GET or None)
         if self.filtro_form.is_valid():
@@ -394,6 +424,74 @@ class MovimentacaoListView(LoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         context['filtro_form'] = self.filtro_form
         return context
+
+
+class MovimentacaoDetailView(LoginRequiredMixin, DetailView):
+    model = Movimentacao
+    template_name = 'estoque/movimentacao_detail.html'
+    context_object_name = 'movimentacao'
+
+    def get_queryset(self):
+        return filtrar_movimentacoes_por_usuario(self.request.user)
+
+
+class MovimentacaoDeleteView(LoginRequiredMixin, DeleteView):
+    """
+    Exclui um registro de movimentação e ESTORNA automaticamente o efeito
+    dela no estoque do produto/unidade correspondente:
+
+      - Movimentação de ENTRADA: ela tinha SOMADO `quantidade` ao estoque
+        quando foi criada (Movimentacao.save()). Excluir precisa SUBTRAIR
+        de volta. Se o estoque atual for menor que essa quantidade — ou
+        seja, parte dela já foi consumida por saídas registradas depois —
+        a exclusão é bloqueada, porque estornar deixaria o estoque negativo.
+
+      - Movimentação de SAÍDA: ela tinha SUBTRAÍDO `quantidade` do estoque.
+        Excluir precisa DEVOLVER essa quantidade. Sempre seguro (nunca
+        deixa o estoque negativo), então não tem bloqueio nesse caso.
+
+    O estorno e a exclusão do registro acontecem na mesma transação — ou os
+    dois acontecem, ou nenhum (evita estoque e histórico ficarem
+    dessincronizados se algo falhar no meio do caminho).
+    """
+    model = Movimentacao
+    template_name = 'estoque/confirm_delete.html'
+    success_url = reverse_lazy('estoque:movimentacao_list')
+
+    def get_queryset(self):
+        return filtrar_movimentacoes_por_usuario(self.request.user)
+
+    def form_valid(self, form):
+        movimentacao = self.object
+        produto = movimentacao.produto
+
+        if movimentacao.tipo == Movimentacao.ENTRADA and produto.quantidade < movimentacao.quantidade:
+            messages.error(
+                self.request,
+                f'Não é possível excluir esta entrada: o estoque atual de "{produto.nome}" '
+                f'({produto.quantidade}) é menor que a quantidade dela ({movimentacao.quantidade}) '
+                f'— parte já foi usada em saídas registradas depois. Ajuste o estoque manualmente '
+                f'antes de excluir, se necessário.',
+            )
+            return redirect('estoque:movimentacao_list')
+
+        produto_nome = produto.nome
+        tipo_label = movimentacao.get_tipo_display()
+        quantidade = movimentacao.quantidade
+
+        with transaction.atomic():
+            if movimentacao.tipo == Movimentacao.ENTRADA:
+                produto.quantidade -= quantidade
+            else:
+                produto.quantidade += quantidade
+            produto.save(update_fields=['quantidade', 'atualizado_em'])
+            response = super().form_valid(form)
+
+        messages.success(
+            self.request,
+            f'{tipo_label} de {quantidade} × "{produto_nome}" excluída e estornada no estoque com sucesso.',
+        )
+        return response
 
 
 class MovimentacaoCreateView(LoginRequiredMixin, CreateView):
