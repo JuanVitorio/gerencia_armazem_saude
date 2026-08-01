@@ -121,6 +121,44 @@
                 </a>
             </div>
         </div>
+
+        <!-- Relatório 7: Saldo de Dias de Folga -->
+        <div class="report-card">
+            <div class="report-card-header text-primary">
+                <i class="bi bi-calendar-heart-fill me-2"></i> Saldo de Dias de Folga
+            </div>
+            <div class="report-card-body">
+                <p>Saldo atual de dias de folga (créditos menos débitos) de cada funcionário.</p>
+                <a href="{% url 'estoque:relatorio_gerar' tipo='saldo_folgas' %}" target="_blank" class="btn btn-primary btn-sm w-100">
+                    <i class="bi bi-file-earmark-pdf-fill"></i> Gerar PDF
+                </a>
+            </div>
+        </div>
+
+        <!-- Relatório 8: Lançamentos de Folga do Período -->
+        <div class="report-card">
+            <div class="report-card-header text-info">
+                <i class="bi bi-calendar-week-fill me-2"></i> Lançamentos de Folga
+            </div>
+            <div class="report-card-body">
+                <p>Créditos (eventos/manuais) e débitos (folgas usadas) registrados no período.</p>
+                <form action="{% url 'estoque:relatorio_gerar' tipo='lancamentos_folgas' %}" method="get" target="_blank">
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label-compact mb-1">De:</label>
+                            <input type="date" name="data_inicio" value="{{ inicio_mes }}" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label-compact mb-1">Até:</label>
+                            <input type="date" name="data_fim" value="{{ hoje }}" class="form-control form-control-sm">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-info btn-sm w-100 text-white">
+                        <i class="bi bi-file-earmark-pdf-fill"></i> Gerar PDF
+                    </button>
+                </form>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}

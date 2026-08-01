@@ -1,0 +1,91 @@
+{% extends 'estoque/base.html' %}
+{% block title %}{{ evento.nome }} — Eventos de Folga{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title mb-0"><i class="bi bi-calendar-event text-primary"></i> {{ evento.nome }}</h1>
+            <p class="page-subtitle">{{ evento.data|date:'d/m/Y' }} — {{ evento.dias }} dia{{ evento.dias|pluralize }} de folga por participante</p>
+        </div>
+        <div class="page-actions">
+            <a href="{% url 'estoque:evento_folga_list' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Voltar
+            </a>
+        </div>
+    </div>
+
+    {% if evento.descricao %}
+    <div class="alert-inline mb-3">
+        <i class="bi bi-info-circle"></i> {{ evento.descricao }}
+    </div>
+    {% endif %}
+
+    <div class="detail-stats">
+        <div class="detail-stat">
+            <span class="detail-stat-label">Participantes</span>
+            <span class="detail-stat-value">{{ participantes|length }}</span>
+            <span class="detail-stat-unit">funcionário{{ participantes|length|pluralize }}</span>
+        </div>
+        <div class="detail-stat">
+            <span class="detail-stat-label">Registrado por</span>
+            <span class="detail-stat-value" style="font-size: 1.1rem;">{{ evento.usuario|default:'—' }}</span>
+        </div>
+        <div class="detail-stat">
+            <span class="detail-stat-label">Registrado em</span>
+            <span class="detail-stat-value" style="font-size: 1.1rem;">{{ evento.criado_em|date:'d/m/Y H:i' }}</span>
+        </div>
+    </div>
+
+    <div class="table-card">
+        <div class="table-card-header">
+            <h2 class="table-card-title">
+                <i class="bi bi-people text-primary me-1"></i> Funcionários que participaram
+            </h2>
+        </div>
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Funcionário</th>
+                        <th>Cargo</th>
+                        <th>Unidade</th>
+                        <th class="text-end">Dias concedidos</th>
+                        <th class="text-end">Opções</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for lanc in participantes %}
+                    <tr>
+                        <td>
+                            <a href="{{ lanc.funcionario.get_absolute_url }}" class="item-link-dark">
+                                {{ lanc.funcionario.nome }}
+                            </a>
+                        </td>
+                        <td>{{ lanc.funcionario.cargo|default:'—' }}</td>
+                        <td>{{ lanc.funcionario.unidade|default:'—' }}</td>
+                        <td class="text-end"><span class="qty-badge">+{{ lanc.dias }} dia{{ lanc.dias|pluralize }}</span></td>
+                        <td class="text-end">
+                            <div class="btn-group-compact">
+                                <a href="{% url 'estoque:lancamento_delete' lanc.pk %}" class="btn-icon" title="Remover participante">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="5">
+                            <div class="empty-state-inline">
+                                <i class="bi bi-people text-muted"></i>
+                                <p>Nenhum participante neste evento.</p>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

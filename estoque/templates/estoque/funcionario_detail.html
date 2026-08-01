@@ -1,6 +1,6 @@
 {% extends 'estoque/base.html' %}
 {% load humanize %}
-{% block title %}{{ funcionario.nome }} — Banco de Horas{% endblock %}
+{% block title %}{{ funcionario.nome }} — Banco de Dias de Folga{% endblock %}
 
 {% block content %}
 <div class="page-container">
@@ -21,8 +21,8 @@
         </div>
         <div class="page-actions">
             <a href="{% url 'estoque:lancamento_create' %}?funcionario={{ funcionario.pk }}"
-               class="btn btn-success btn-sm" id="btn-lancar-horas-detalhe">
-                <i class="bi bi-plus-slash-minus"></i> Lançar Horas
+               class="btn btn-success btn-sm" id="btn-lancamento-detalhe">
+                <i class="bi bi-plus-slash-minus"></i> Lançamento Manual
             </a>
             <a href="{% url 'estoque:funcionario_update' funcionario.pk %}"
                class="btn btn-outline-secondary btn-sm">
@@ -36,10 +36,10 @@
 
     <!-- Saldo -->
     <div class="detail-stats">
-        <div class="detail-stat {% if funcionario.saldo_horas < 0 %}detail-stat-danger{% endif %}">
+        <div class="detail-stat {% if funcionario.saldo_dias < 0 %}detail-stat-danger{% endif %}">
             <span class="detail-stat-label">Saldo Atual</span>
-            <span class="detail-stat-value">{{ funcionario.saldo_horas }}</span>
-            <span class="detail-stat-unit">horas</span>
+            <span class="detail-stat-value">{{ funcionario.saldo_dias }}</span>
+            <span class="detail-stat-unit">dia{{ funcionario.saldo_dias|pluralize }} de folga</span>
         </div>
         <div class="detail-stat">
             <span class="detail-stat-label">Matrícula</span>
@@ -55,7 +55,7 @@
     <div class="table-card">
         <div class="table-card-header">
             <h2 class="table-card-title">
-                <i class="bi bi-clock-history text-primary me-1"></i> Histórico de Lançamentos
+                <i class="bi bi-calendar-heart text-primary me-1"></i> Histórico de Lançamentos
             </h2>
             <a href="{% url 'estoque:lancamento_create' %}?funcionario={{ funcionario.pk }}"
                class="btn btn-success btn-sm">
@@ -67,9 +67,9 @@
                 <thead>
                     <tr>
                         <th>Tipo</th>
-                        <th>Horas</th>
+                        <th>Dias</th>
                         <th>Data de referência</th>
-                        <th>Motivo / Observação</th>
+                        <th>Motivo / Evento</th>
                         <th>Registrado por</th>
                         <th class="text-end">Opções</th>
                     </tr>
@@ -84,9 +84,15 @@
                                 <span class="mov-badge mov-saida"><i class="bi bi-dash-lg"></i> Débito</span>
                             {% endif %}
                         </td>
-                        <td class="fw-bold">{{ lanc.horas }}h</td>
+                        <td class="fw-bold">{{ lanc.dias }} dia{{ lanc.dias|pluralize }}</td>
                         <td>{{ lanc.data_referencia|date:'d/m/Y' }}</td>
-                        <td class="text-muted small">{{ lanc.motivo|default:'—' }}</td>
+                        <td class="text-muted small">
+                            {% if lanc.evento %}
+                                <a href="{{ lanc.evento.get_absolute_url }}"><i class="bi bi-calendar-event"></i> {{ lanc.evento.nome }}</a>
+                            {% else %}
+                                {{ lanc.motivo|default:'—' }}
+                            {% endif %}
+                        </td>
                         <td class="small"><i class="bi bi-person me-1"></i>{{ lanc.usuario|default:'—' }}</td>
                         <td class="text-end">
                             <div class="btn-group-compact">
@@ -100,7 +106,7 @@
                     <tr>
                         <td colspan="6">
                             <div class="empty-state-inline">
-                                <i class="bi bi-clock text-muted"></i>
+                                <i class="bi bi-calendar text-muted"></i>
                                 <p>Nenhum lançamento registrado para este funcionário.</p>
                             </div>
                         </td>

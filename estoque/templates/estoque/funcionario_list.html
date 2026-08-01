@@ -1,16 +1,19 @@
 {% extends 'estoque/base.html' %}
-{% block title %}Banco de Horas — Gestão de Estoque{% endblock %}
+{% block title %}Dias de Folga — Gestão de Estoque{% endblock %}
 
 {% block content %}
 <div class="page-container">
     <div class="page-header">
         <div>
-            <h1 class="page-title"><i class="bi bi-clock-history text-primary"></i> Banco de Horas</h1>
-            <p class="page-subtitle">Saldo de horas extras e compensadas por funcionário.</p>
+            <h1 class="page-title"><i class="bi bi-calendar-heart text-primary"></i> Banco de Dias de Folga</h1>
+            <p class="page-subtitle">Saldo de dias de folga concedidos e usados por funcionário.</p>
         </div>
         <div class="page-actions">
-            <a href="{% url 'estoque:lancamento_create' %}" class="btn btn-success btn-sm" id="btn-lancar-horas">
-                <i class="bi bi-plus-slash-minus"></i> Lançar Horas
+            <a href="{% url 'estoque:evento_folga_list' %}" class="btn btn-outline-secondary btn-sm" id="btn-ver-eventos">
+                <i class="bi bi-calendar-event"></i> Eventos
+            </a>
+            <a href="{% url 'estoque:evento_folga_create' %}" class="btn btn-success btn-sm" id="btn-registrar-evento">
+                <i class="bi bi-calendar-plus"></i> Registrar Evento
             </a>
             <a href="{% url 'estoque:funcionario_create' %}" class="btn btn-primary btn-sm" id="btn-novo-funcionario">
                 <i class="bi bi-person-plus"></i> Novo Funcionário
@@ -71,12 +74,12 @@
                             {% endif %}
                         </td>
                         <td class="text-end">
-                            {% if funcionario.saldo_horas > 0 %}
-                                <span class="qty-badge">+{{ funcionario.saldo_horas }}h</span>
-                            {% elif funcionario.saldo_horas < 0 %}
-                                <span class="qty-badge qty-badge-danger">{{ funcionario.saldo_horas }}h</span>
+                            {% if funcionario.saldo_dias > 0 %}
+                                <span class="qty-badge">+{{ funcionario.saldo_dias }} dia{{ funcionario.saldo_dias|pluralize }}</span>
+                            {% elif funcionario.saldo_dias < 0 %}
+                                <span class="qty-badge qty-badge-danger">{{ funcionario.saldo_dias }} dia{{ funcionario.saldo_dias|pluralize }}</span>
                             {% else %}
-                                <span class="text-muted">0h</span>
+                                <span class="text-muted">0 dia</span>
                             {% endif %}
                         </td>
                         <td>
@@ -89,7 +92,7 @@
                         <td class="text-end">
                             <div class="btn-group-compact">
                                 <a href="{% url 'estoque:lancamento_create' %}?funcionario={{ funcionario.pk }}"
-                                   class="btn-icon" title="Lançar horas">
+                                   class="btn-icon" title="Lançamento manual">
                                     <i class="bi bi-plus-slash-minus"></i>
                                 </a>
                                 <a href="{{ funcionario.get_absolute_url }}" class="btn-icon" title="Ver">
@@ -105,7 +108,7 @@
                     <tr>
                         <td colspan="6">
                             <div class="empty-state-inline">
-                                <i class="bi bi-clock-history text-muted"></i>
+                                <i class="bi bi-calendar-heart text-muted"></i>
                                 <p>Nenhum funcionário cadastrado.</p>
                                 <a href="{% url 'estoque:funcionario_create' %}" class="btn btn-primary btn-sm">
                                     <i class="bi bi-plus-lg"></i> Cadastrar Primeiro Funcionário

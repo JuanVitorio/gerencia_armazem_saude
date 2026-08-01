@@ -52,9 +52,9 @@
                href="{% url 'estoque:usuario_list' %}" title="Gerenciar Usuários">
                 <i class="bi bi-people"></i> Usuários
             </a>
-            <a class="nav-link nav-link-admin {% if 'funcionario' in request.resolver_match.url_name or 'lancamento' in request.resolver_match.url_name %}active{% endif %}"
-               href="{% url 'estoque:funcionario_list' %}" title="Banco de Horas">
-                <i class="bi bi-clock-history"></i> Banco de Horas
+            <a class="nav-link nav-link-admin {% if 'funcionario' in request.resolver_match.url_name or 'lancamento' in request.resolver_match.url_name or 'evento_folga' in request.resolver_match.url_name %}active{% endif %}"
+               href="{% url 'estoque:funcionario_list' %}" title="Banco de Dias de Folga">
+                <i class="bi bi-calendar-heart"></i> Dias de Folga
             </a>
             {% elif user.perfil and user.perfil.is_admin %}
             <div class="nav-separator"></div>
@@ -66,9 +66,9 @@
                href="{% url 'estoque:usuario_list' %}">
                 <i class="bi bi-people"></i> Usuários
             </a>
-            <a class="nav-link nav-link-admin {% if 'funcionario' in request.resolver_match.url_name or 'lancamento' in request.resolver_match.url_name %}active{% endif %}"
+            <a class="nav-link nav-link-admin {% if 'funcionario' in request.resolver_match.url_name or 'lancamento' in request.resolver_match.url_name or 'evento_folga' in request.resolver_match.url_name %}active{% endif %}"
                href="{% url 'estoque:funcionario_list' %}">
-                <i class="bi bi-clock-history"></i> Banco de Horas
+                <i class="bi bi-calendar-heart"></i> Dias de Folga
             </a>
             {% endif %}
         </div>
@@ -156,7 +156,7 @@
                 <i class="bi bi-people"></i> Usuários
             </a>
             <a class="nav-link-mobile" href="{% url 'estoque:funcionario_list' %}">
-                <i class="bi bi-clock-history"></i> Banco de Horas
+                <i class="bi bi-calendar-heart"></i> Dias de Folga
             </a>
             {% endif %}
         </nav>
