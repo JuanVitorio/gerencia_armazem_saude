@@ -4,6 +4,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import User
+from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, Q
 from django.forms import ValidationError
@@ -62,6 +63,39 @@ def filtrar_produtos_por_usuario(user, queryset=None):
     unidade = get_unidade_do_usuario(user)
     if unidade is not None:
         queryset = queryset.filter(unidade=unidade)
+    return queryset
+
+
+def aplicar_filtro_produtos(queryset, filtro_form):
+    """
+    Aplica os filtros de busca/categoria/situação de um ProdutoFiltroForm
+    válido a um queryset de Produto. Compartilhado entre ProdutoListView e
+    UnidadeDetailView (pesquisa de estoque dentro de uma unidade).
+    """
+    if not filtro_form.is_valid():
+        return queryset
+    termo = filtro_form.cleaned_data.get('q')
+    categoria = filtro_form.cleaned_data.get('categoria')
+    situacao = filtro_form.cleaned_data.get('situacao')
+    if termo:
+        queryset = queryset.filter(
+            Q(nome__icontains=termo) | Q(sku__icontains=termo) |
+            Q(lote__icontains=termo) | Q(detalhes__icontains=termo) |
+            Q(categoria__nome__icontains=termo)
+        )
+    if categoria:
+        queryset = queryset.filter(categoria=categoria)
+    hoje = timezone.localdate()
+    if situacao == 'BAIXO':
+        queryset = queryset.filter(quantidade__lte=settings.LIMITE_ESTOQUE_BAIXO)
+    elif situacao == 'VENCIDO':
+        queryset = queryset.filter(data_validade__isnull=False, data_validade__lt=hoje)
+    elif situacao == 'VENCENDO':
+        queryset = queryset.filter(
+            data_validade__isnull=False,
+            data_validade__gte=hoje,
+            data_validade__lte=hoje + timedelta(days=settings.DIAS_ALERTA_VENCIMENTO),
+        )
     return queryset
 
 
@@ -128,11 +162,28 @@ class UnidadeDetailView(LoginRequiredMixin, AdminRequiredMixin, DetailView):
     model = Unidade
     template_name = 'estoque/unidade_detail.html'
     context_object_name = 'unidade'
+    paginate_by = 20
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['membros'] = self.object.membros.select_related('usuario').all()
         context['total_produtos'] = self.object.produtos.filter(ativo=True).count()
+        context['funcionarios_unidade'] = self.object.funcionarios.filter(ativo=True).order_by('nome')
+
+        # Estoque da unidade, pesquisável (mesmo ProdutoFiltroForm da tela de Produtos)
+        # — é a tela que o admin usa pra checar rapidamente "tem vacina no Posto A?".
+        produtos_qs = self.object.produtos.filter(ativo=True).select_related('categoria')
+        self.filtro_form = ProdutoFiltroForm(self.request.GET or None)
+        produtos_qs = aplicar_filtro_produtos(produtos_qs, self.filtro_form).order_by('nome')
+
+        paginator = Paginator(produtos_qs, self.paginate_by)
+        page_obj = paginator.get_page(self.request.GET.get('page'))
+
+        context['filtro_form'] = self.filtro_form
+        context['produtos'] = page_obj
+        context['page_obj'] = page_obj
+        context['paginator'] = paginator
+        context['is_paginated'] = page_obj.has_other_pages()
         return context
 
 
@@ -174,30 +225,7 @@ class ProdutoListView(LoginRequiredMixin, ListView):
             Produto.objects.select_related('categoria', 'unidade'),
         )
         self.filtro_form = ProdutoFiltroForm(self.request.GET or None)
-        if self.filtro_form.is_valid():
-            termo = self.filtro_form.cleaned_data.get('q')
-            categoria = self.filtro_form.cleaned_data.get('categoria')
-            situacao = self.filtro_form.cleaned_data.get('situacao')
-            if termo:
-                qs = qs.filter(
-                    Q(nome__icontains=termo) | Q(sku__icontains=termo) |
-                    Q(lote__icontains=termo) | Q(detalhes__icontains=termo) |
-                    Q(categoria__nome__icontains=termo)
-                )
-            if categoria:
-                qs = qs.filter(categoria=categoria)
-            hoje = timezone.localdate()
-            if situacao == 'BAIXO':
-                qs = qs.filter(quantidade__lte=settings.LIMITE_ESTOQUE_BAIXO)
-            elif situacao == 'VENCIDO':
-                qs = qs.filter(data_validade__isnull=False, data_validade__lt=hoje)
-            elif situacao == 'VENCENDO':
-                qs = qs.filter(
-                    data_validade__isnull=False,
-                    data_validade__gte=hoje,
-                    data_validade__lte=hoje + timedelta(days=settings.DIAS_ALERTA_VENCIMENTO),
-                )
-        return qs
+        return aplicar_filtro_produtos(qs, self.filtro_form)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -525,6 +553,13 @@ class FuncionarioCreateView(LoginRequiredMixin, AdminRequiredMixin, CreateView):
     form_class = FuncionarioForm
     template_name = 'estoque/funcionario_form.html'
     success_url = reverse_lazy('estoque:funcionario_list')
+
+    def get_initial(self):
+        initial = super().get_initial()
+        unidade_id = self.request.GET.get('unidade')
+        if unidade_id:
+            initial['unidade'] = unidade_id
+        return initial
 
     def form_valid(self, form):
         messages.success(self.request, f'Funcionário "{form.instance.nome}" cadastrado com sucesso.')
