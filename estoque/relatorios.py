@@ -11,7 +11,7 @@ from reportlab.platypus import (
     HRFlowable, KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 )
 
-from .models import Movimentacao, Produto
+from .models import Funcionario, LancamentoFolga, Movimentacao, Produto
 
 
 class NumberedCanvas:
@@ -329,3 +329,86 @@ def relatorio_por_categoria(unidade=None):
 
     resumo = f"Total de categorias ativas: <b>{len(cat_map)}</b>"
     return _criar_pdf_base("Relatório de Estoque por Categoria", sub, rows, widths, resumo)
+
+
+def relatorio_saldo_folgas(unidade=None):
+    qs = Funcionario.objects.filter(ativo=True).select_related('unidade').order_by('nome')
+    if unidade:
+        qs = qs.filter(unidade=unidade)
+
+    sub = f"Unidade: {unidade.nome}" if unidade else "Todas as Unidades"
+
+    header = ['Funcionário', 'Cargo', 'Unidade', 'Saldo Atual']
+    widths = [6.5 * cm, 4.5 * cm, 4.0 * cm, 3.0 * cm]
+
+    rows = [header]
+    positivos = negativos = 0
+    for f in qs:
+        saldo = f.saldo_dias
+        if saldo > 0:
+            saldo_str = f"<font color='#16A34A'><b>+{saldo} dia(s)</b></font>"
+            positivos += 1
+        elif saldo < 0:
+            saldo_str = f"<font color='#DC2626'><b>{saldo} dia(s)</b></font>"
+            negativos += 1
+        else:
+            saldo_str = "0 dia"
+        rows.append([f.nome, f.cargo or '—', f.unidade.nome if f.unidade else '—', saldo_str])
+
+    resumo = (
+        f"Funcionários listados: <b>{len(rows) - 1}</b> | "
+        f"Com saldo positivo: <b>{positivos}</b> | Com saldo negativo: <b>{negativos}</b>"
+    )
+    return _criar_pdf_base("Relatório de Saldo de Dias de Folga", sub, rows, widths, resumo)
+
+
+def relatorio_lancamentos_folgas(unidade=None, data_inicio=None, data_fim=None, tipo=None):
+    qs = LancamentoFolga.objects.select_related('funcionario', 'funcionario__unidade', 'evento', 'usuario')
+    qs = qs.order_by('-data_referencia', '-criado_em')
+
+    if unidade:
+        qs = qs.filter(funcionario__unidade=unidade)
+    if data_inicio:
+        qs = qs.filter(data_referencia__gte=data_inicio)
+    if data_fim:
+        qs = qs.filter(data_referencia__lte=data_fim)
+    if tipo:
+        qs = qs.filter(tipo=tipo)
+
+    titulo_tipo = "Lançamentos de Folga"
+    if tipo == LancamentoFolga.CREDITO:
+        titulo_tipo = "Créditos de Folga"
+    elif tipo == LancamentoFolga.DEBITO:
+        titulo_tipo = "Débitos de Folga"
+
+    p_str = ""
+    if data_inicio and data_fim:
+        p_str = f"Período: {data_inicio.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')}"
+
+    sub = f"Unidade: {unidade.nome} • {p_str}" if unidade else f"Todas as Unidades • {p_str}"
+
+    header = ['Data Ref.', 'Funcionário', 'Tipo', 'Dias', 'Motivo / Evento']
+    widths = [3.0 * cm, 5.5 * cm, 2.5 * cm, 2.0 * cm, 5.0 * cm]
+
+    rows = [header]
+    total_creditos = total_debitos = 0
+    for lanc in qs:
+        dt_str = lanc.data_referencia.strftime('%d/%m/%Y')
+        func_str = lanc.funcionario.nome
+        if lanc.tipo == LancamentoFolga.CREDITO:
+            tipo_str = "<font color='#16A34A'><b>CRÉDITO</b></font>"
+            total_creditos += lanc.dias
+        else:
+            tipo_str = "<font color='#DC2626'><b>DÉBITO</b></font>"
+            total_debitos += lanc.dias
+        motivo_str = lanc.motivo or '—'
+        if lanc.evento:
+            motivo_str += f"<br/><font color='#64748B'>Evento: {lanc.evento.nome}</font>"
+
+        rows.append([dt_str, func_str, tipo_str, str(lanc.dias), motivo_str])
+
+    resumo = (
+        f"Total de lançamentos: <b>{len(rows) - 1}</b> | "
+        f"Dias creditados: <b>{total_creditos}</b> | Dias debitados: <b>{total_debitos}</b>"
+    )
+    return _criar_pdf_base(f"Relatório de {titulo_tipo}", sub, rows, widths, resumo)

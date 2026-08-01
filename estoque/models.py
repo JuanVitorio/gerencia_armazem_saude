@@ -286,13 +286,13 @@ class Movimentacao(models.Model):
 
 
 # ---------------------------------------------------------------------------
-# Banco de Horas
+# Banco de Dias de Folga
 # ---------------------------------------------------------------------------
 
 class Funcionario(models.Model):
     """
-    Cadastro de funcionário para o banco de horas. Não tem login no
-    sistema — é só um registro administrativo, gerenciado pelo
+    Cadastro de funcionário para o banco de dias de folga. Não tem login
+    no sistema — é só um registro administrativo, gerenciado pelo
     gestor/RH (mesma permissão de Unidade/Usuário, ver AdminRequiredMixin).
     """
     nome = models.CharField('Nome', max_length=150)
@@ -317,38 +317,79 @@ class Funcionario(models.Model):
         return reverse('estoque:funcionario_detail', args=[self.pk])
 
     @property
-    def saldo_horas(self):
-        """Créditos (horas extras) menos débitos (horas compensadas/folgas)."""
+    def saldo_dias(self):
+        """Créditos (dias concedidos) menos débitos (dias de folga usados)."""
         agregados = self.lancamentos.aggregate(
-            creditos=models.Sum('horas', filter=models.Q(tipo=LancamentoBancoHoras.CREDITO)),
-            debitos=models.Sum('horas', filter=models.Q(tipo=LancamentoBancoHoras.DEBITO)),
+            creditos=models.Sum('dias', filter=models.Q(tipo=LancamentoFolga.CREDITO)),
+            debitos=models.Sum('dias', filter=models.Q(tipo=LancamentoFolga.DEBITO)),
         )
         creditos = agregados['creditos'] or 0
         debitos = agregados['debitos'] or 0
         return creditos - debitos
 
 
-class LancamentoBancoHoras(models.Model):
+class EventoFolga(models.Model):
     """
-    Cada lançamento é um crédito (horas extras trabalhadas) ou débito
-    (horas compensadas/folga) para um funcionário. O saldo é sempre
-    calculado a partir do histórico (Funcionario.saldo_horas), então
-    corrigir ou excluir um lançamento sempre mantém o saldo consistente.
+    Um evento em que funcionários trabalharam num dia que normalmente não
+    trabalhariam (ex: "Dia de Vacinação") e por isso ganham dias de folga.
+    Ao salvar os participantes (na view), é criado um LancamentoFolga de
+    crédito para cada um, todos apontando para este evento.
+    """
+    nome = models.CharField('Nome do evento', max_length=150, help_text='Ex: Dia de Vacinação, Mutirão de Saúde...')
+    data = models.DateField('Data do evento', default=timezone.localdate)
+    descricao = models.TextField('Descrição', blank=True)
+    dias = models.PositiveSmallIntegerField(
+        'Dias de folga por participante', default=1,
+        help_text='Quantos dias de folga cada funcionário participante recebe.'
+    )
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='eventos_folga_criados', verbose_name='Registrado por',
+    )
+    criado_em = models.DateTimeField('Criado em', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Evento de Folga'
+        verbose_name_plural = 'Eventos de Folga'
+        ordering = ['-data', '-criado_em']
+
+    def __str__(self):
+        return f'{self.nome} ({self.data:%d/%m/%Y})'
+
+    def get_absolute_url(self):
+        return reverse('estoque:evento_folga_detail', args=[self.pk])
+
+    @property
+    def total_participantes(self):
+        return self.lancamentos.count()
+
+
+class LancamentoFolga(models.Model):
+    """
+    Cada lançamento é um crédito (dias de folga concedidos, geralmente via
+    um EventoFolga) ou débito (dias de folga usados/tirados) para um
+    funcionário. O saldo é sempre calculado a partir do histórico
+    (Funcionario.saldo_dias), então corrigir ou excluir um lançamento
+    sempre mantém o saldo consistente.
     """
     CREDITO = 'CREDITO'
     DEBITO = 'DEBITO'
     TIPO_CHOICES = [
-        (CREDITO, 'Crédito (horas trabalhadas/extras)'),
-        (DEBITO, 'Débito (horas compensadas/folga)'),
+        (CREDITO, 'Crédito (dia de folga concedido)'),
+        (DEBITO, 'Débito (dia de folga usado)'),
     ]
 
     funcionario = models.ForeignKey(
         Funcionario, on_delete=models.CASCADE, related_name='lancamentos', verbose_name='Funcionário',
     )
     tipo = models.CharField('Tipo', max_length=7, choices=TIPO_CHOICES)
-    horas = models.DecimalField('Horas', max_digits=5, decimal_places=2)
+    dias = models.PositiveSmallIntegerField('Dias de folga')
     data_referencia = models.DateField('Data de referência', default=timezone.localdate)
     motivo = models.CharField('Motivo / Observação', max_length=255, blank=True)
+    evento = models.ForeignKey(
+        EventoFolga, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='lancamentos', verbose_name='Evento de origem',
+    )
     usuario = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='lancamentos_banco_horas', verbose_name='Registrado por',
@@ -356,14 +397,15 @@ class LancamentoBancoHoras(models.Model):
     criado_em = models.DateTimeField('Criado em', auto_now_add=True)
 
     class Meta:
-        verbose_name = 'Lançamento de Banco de Horas'
-        verbose_name_plural = 'Lançamentos de Banco de Horas'
+        verbose_name = 'Lançamento de Folga'
+        verbose_name_plural = 'Lançamentos de Folga'
         ordering = ['-data_referencia', '-criado_em']
 
     def __str__(self):
         sinal = '+' if self.tipo == self.CREDITO else '-'
-        return f'{sinal}{self.horas}h — {self.funcionario.nome} ({self.data_referencia:%d/%m/%Y})'
+        plural = 'dia' if self.dias == 1 else 'dias'
+        return f'{sinal}{self.dias} {plural} — {self.funcionario.nome} ({self.data_referencia:%d/%m/%Y})'
 
     def clean(self):
-        if self.horas is not None and self.horas <= 0:
-            raise ValidationError('A quantidade de horas deve ser maior que zero.')
+        if self.dias is not None and self.dias <= 0:
+            raise ValidationError('A quantidade de dias deve ser maior que zero.')

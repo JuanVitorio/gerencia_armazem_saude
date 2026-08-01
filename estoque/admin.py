@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Categoria, Funcionario, LancamentoBancoHoras, Movimentacao, PerfilUsuario, Produto, Unidade
+from .models import Categoria, EventoFolga, Funcionario, LancamentoFolga, Movimentacao, PerfilUsuario, Produto, Unidade
 
 
 @admin.register(Categoria)
@@ -44,16 +44,24 @@ class MovimentacaoAdmin(admin.ModelAdmin):
 
 @admin.register(Funcionario)
 class FuncionarioAdmin(admin.ModelAdmin):
-    list_display = ('nome', 'cargo', 'matricula', 'unidade', 'ativo', 'saldo_horas')
+    list_display = ('nome', 'cargo', 'matricula', 'unidade', 'ativo', 'saldo_dias')
     list_filter = ('unidade', 'ativo')
     search_fields = ('nome', 'cargo', 'matricula')
     autocomplete_fields = ('unidade',)
 
 
-@admin.register(LancamentoBancoHoras)
-class LancamentoBancoHorasAdmin(admin.ModelAdmin):
-    list_display = ('funcionario', 'tipo', 'horas', 'data_referencia', 'usuario', 'criado_em')
+@admin.register(EventoFolga)
+class EventoFolgaAdmin(admin.ModelAdmin):
+    list_display = ('nome', 'data', 'dias', 'total_participantes', 'usuario', 'criado_em')
+    list_filter = ('data',)
+    search_fields = ('nome', 'descricao')
+    readonly_fields = ('criado_em',)
+
+
+@admin.register(LancamentoFolga)
+class LancamentoFolgaAdmin(admin.ModelAdmin):
+    list_display = ('funcionario', 'tipo', 'dias', 'data_referencia', 'evento', 'usuario', 'criado_em')
     list_filter = ('tipo', 'data_referencia')
     search_fields = ('funcionario__nome', 'motivo')
-    autocomplete_fields = ('funcionario',)
+    autocomplete_fields = ('funcionario', 'evento')
     readonly_fields = ('criado_em',)

@@ -34,11 +34,14 @@ urlpatterns = [
     # Banco de Horas (admin/RH only)
     path('banco-de-horas/', views.FuncionarioListView.as_view(), name='funcionario_list'),
     path('banco-de-horas/novo/', views.FuncionarioCreateView.as_view(), name='funcionario_create'),
+    path('banco-de-horas/lancamento/novo/', views.LancamentoFolgaCreateView.as_view(), name='lancamento_create'),
+    path('banco-de-horas/lancamento/<int:pk>/excluir/', views.LancamentoFolgaDeleteView.as_view(), name='lancamento_delete'),
+    path('banco-de-horas/eventos/', views.EventoFolgaListView.as_view(), name='evento_folga_list'),
+    path('banco-de-horas/eventos/novo/', views.EventoFolgaCreateView.as_view(), name='evento_folga_create'),
+    path('banco-de-horas/eventos/<int:pk>/', views.EventoFolgaDetailView.as_view(), name='evento_folga_detail'),
     path('banco-de-horas/<int:pk>/', views.FuncionarioDetailView.as_view(), name='funcionario_detail'),
     path('banco-de-horas/<int:pk>/editar/', views.FuncionarioUpdateView.as_view(), name='funcionario_update'),
     path('banco-de-horas/<int:pk>/excluir/', views.FuncionarioDeleteView.as_view(), name='funcionario_delete'),
-    path('banco-de-horas/lancamento/novo/', views.LancamentoBancoHorasCreateView.as_view(), name='lancamento_create'),
-    path('banco-de-horas/lancamento/<int:pk>/excluir/', views.LancamentoBancoHorasDeleteView.as_view(), name='lancamento_delete'),
 
     # Relatórios
     path('relatorios/', views.RelatorioListView.as_view(), name='relatorio_list'),

@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 
-from .models import Categoria, Funcionario, LancamentoBancoHoras, Movimentacao, PerfilUsuario, Produto, Unidade
+from .models import Categoria, EventoFolga, Funcionario, LancamentoFolga, Movimentacao, PerfilUsuario, Produto, Unidade
 
 
 class BaseFormMixin:
@@ -190,25 +190,49 @@ class FuncionarioForm(BaseFormMixin, forms.ModelForm):
         }
 
 
-class LancamentoBancoHorasForm(BaseFormMixin, forms.ModelForm):
+class LancamentoFolgaForm(BaseFormMixin, forms.ModelForm):
+    """Lançamento manual (crédito avulso ou débito de dia usado)."""
+
     class Meta:
-        model = LancamentoBancoHoras
-        fields = ['funcionario', 'tipo', 'horas', 'data_referencia', 'motivo']
+        model = LancamentoFolga
+        fields = ['funcionario', 'tipo', 'dias', 'data_referencia', 'motivo']
         widgets = {
             'data_referencia': forms.DateInput(attrs={'type': 'date'}),
-            'horas': forms.NumberInput(attrs={'step': '0.25', 'min': '0.25', 'placeholder': 'Ex: 2 ou 1.5'}),
-            'motivo': forms.TextInput(attrs={'placeholder': 'Ex: Hora extra no plantão, folga compensatória...'}),
+            'dias': forms.NumberInput(attrs={'step': '1', 'min': '1', 'placeholder': 'Ex: 1'}),
+            'motivo': forms.TextInput(attrs={'placeholder': 'Ex: Folga usada, ajuste manual...'}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['funcionario'].queryset = Funcionario.objects.filter(ativo=True).order_by('nome')
 
-    def clean_horas(self):
-        horas = self.cleaned_data.get('horas')
-        if not horas or horas <= 0:
-            raise forms.ValidationError('A quantidade de horas deve ser maior que zero.')
-        return horas
+    def clean_dias(self):
+        dias = self.cleaned_data.get('dias')
+        if not dias or dias <= 0:
+            raise forms.ValidationError('A quantidade de dias deve ser maior que zero.')
+        return dias
+
+
+class EventoFolgaForm(BaseFormMixin, forms.ModelForm):
+    """
+    Cadastro do evento (ex: "Dia de Vacinação"). Os funcionários
+    participantes são selecionados à parte, num checklist pesquisável no
+    template (evento_folga_form.html) — não são um campo deste form,
+    porque a view cria um LancamentoFolga de crédito por participante.
+    """
+
+    class Meta:
+        model = EventoFolga
+        fields = ['nome', 'data', 'descricao', 'dias']
+        widgets = {
+            'nome': forms.TextInput(attrs={'autofocus': True, 'placeholder': 'Ex: Dia de Vacinação'}),
+            'data': forms.DateInput(attrs={'type': 'date'}),
+            'descricao': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Detalhes do evento (opcional)'}),
+            'dias': forms.NumberInput(attrs={'step': '1', 'min': '1'}),
+        }
+        help_texts = {
+            'dias': 'Dias de folga que cada funcionário selecionado abaixo vai receber.',
+        }
 
 
 class FuncionarioFiltroForm(forms.Form):

@@ -4,10 +4,11 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import User
+from django.db import transaction
 from django.db.models import Count, Q
 from django.forms import ValidationError
 from django.http import Http404, HttpResponse, JsonResponse
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.views.generic import (
@@ -17,12 +18,14 @@ from django.views.generic import (
 
 from . import relatorios
 from .forms import (
-    FuncionarioFiltroForm, FuncionarioForm, LancamentoBancoHorasForm,
+    EventoFolgaForm, FuncionarioFiltroForm, FuncionarioForm, LancamentoFolgaForm,
     MovimentacaoFiltroForm, MovimentacaoForm,
     PerfilUsuarioForm, ProdutoFiltroForm, ProdutoForm,
     UsuarioForm,
 )
-from .models import Categoria, Funcionario, LancamentoBancoHoras, Movimentacao, PerfilUsuario, Produto, Unidade
+from .models import (
+    Categoria, EventoFolga, Funcionario, LancamentoFolga, Movimentacao, PerfilUsuario, Produto, Unidade,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -76,10 +79,12 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         produtos = filtrar_produtos_por_usuario(
             self.request.user,
-            Produto.objects.filter(ativo=True).select_related('categoria'),
+            Produto.objects.filter(ativo=True).select_related('categoria', 'unidade'),
         )
 
-        estoque_baixo = produtos.filter(quantidade__lte=settings.LIMITE_ESTOQUE_BAIXO)
+        # TODO: revisar se o card de "Estoque Baixo" no dashboard é realmente
+        # necessário. Comentado por enquanto a pedido — não excluir, só reavaliar.
+        # estoque_baixo = produtos.filter(quantidade__lte=settings.LIMITE_ESTOQUE_BAIXO)
         validade_alerta = produtos.filter(
             data_validade__isnull=False,
             data_validade__lte=limite_validade,
@@ -93,12 +98,12 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         context.update({
             'total_produtos': produtos.count(),
-            'total_estoque_baixo': estoque_baixo.count(),
+            # 'total_estoque_baixo': estoque_baixo.count(),
             'total_vencidos': produtos.filter(
                 data_validade__isnull=False,
                 data_validade__lt=hoje,
             ).count(),
-            'produtos_estoque_baixo': estoque_baixo.order_by('quantidade')[:10],
+            # 'produtos_estoque_baixo': estoque_baixo.order_by('quantidade')[:10],
             'produtos_validade': validade_alerta[:10],
             'ultimas_movimentacoes': movs_qs[:10],
             'unidade_atual': unidade,
@@ -475,11 +480,11 @@ class UsuarioUpdateView(LoginRequiredMixin, AdminRequiredMixin, View):
 
 
 # ---------------------------------------------------------------------------
-# Banco de Horas (apenas Admin/RH)
+# Banco de Dias de Folga (apenas Admin/RH)
 # ---------------------------------------------------------------------------
 
 class FuncionarioListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
-    """Tela principal do banco de horas: funcionários e seus saldos."""
+    """Tela principal do banco de folgas: funcionários e seus saldos."""
     model = Funcionario
     template_name = 'estoque/funcionario_list.html'
     context_object_name = 'funcionarios'
@@ -511,7 +516,7 @@ class FuncionarioDetailView(LoginRequiredMixin, AdminRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['lancamentos'] = self.object.lancamentos.select_related('usuario').all()[:50]
+        context['lancamentos'] = self.object.lancamentos.select_related('usuario', 'evento').all()[:50]
         return context
 
 
@@ -549,11 +554,11 @@ class FuncionarioDeleteView(LoginRequiredMixin, AdminRequiredMixin, DeleteView):
         return super().form_valid(form)
 
 
-class LancamentoBancoHorasCreateView(LoginRequiredMixin, AdminRequiredMixin, CreateView):
-    """Lançamento de crédito/débito de horas — só o gestor/RH acessa (AdminRequiredMixin)."""
-    model = LancamentoBancoHoras
-    form_class = LancamentoBancoHorasForm
-    template_name = 'estoque/lancamento_banco_horas_form.html'
+class LancamentoFolgaCreateView(LoginRequiredMixin, AdminRequiredMixin, CreateView):
+    """Lançamento manual de crédito/débito de dia de folga — só o gestor/RH acessa."""
+    model = LancamentoFolga
+    form_class = LancamentoFolgaForm
+    template_name = 'estoque/lancamento_folga_form.html'
     success_url = reverse_lazy('estoque:funcionario_list')
 
     def get_initial(self):
@@ -570,10 +575,11 @@ class LancamentoBancoHorasCreateView(LoginRequiredMixin, AdminRequiredMixin, Cre
         except ValidationError as exc:
             form.add_error(None, exc)
             return self.form_invalid(form)
-        acao = 'Crédito' if form.instance.tipo == LancamentoBancoHoras.CREDITO else 'Débito'
+        acao = 'Crédito' if form.instance.tipo == LancamentoFolga.CREDITO else 'Débito'
+        plural = 'dia' if form.instance.dias == 1 else 'dias'
         messages.success(
             self.request,
-            f'{acao} de {form.instance.horas}h registrado para "{form.instance.funcionario.nome}".',
+            f'{acao} de {form.instance.dias} {plural} registrado para "{form.instance.funcionario.nome}".',
         )
         return response
 
@@ -581,8 +587,8 @@ class LancamentoBancoHorasCreateView(LoginRequiredMixin, AdminRequiredMixin, Cre
         return self.object.funcionario.get_absolute_url()
 
 
-class LancamentoBancoHorasDeleteView(LoginRequiredMixin, AdminRequiredMixin, DeleteView):
-    model = LancamentoBancoHoras
+class LancamentoFolgaDeleteView(LoginRequiredMixin, AdminRequiredMixin, DeleteView):
+    model = LancamentoFolga
     template_name = 'estoque/confirm_delete.html'
 
     def get_success_url(self):
@@ -591,6 +597,78 @@ class LancamentoBancoHorasDeleteView(LoginRequiredMixin, AdminRequiredMixin, Del
     def form_valid(self, form):
         messages.success(self.request, 'Lançamento removido com sucesso.')
         return super().form_valid(form)
+
+
+class EventoFolgaListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
+    """Histórico de eventos que geraram folga (ex: Dia de Vacinação)."""
+    model = EventoFolga
+    template_name = 'estoque/evento_folga_list.html'
+    context_object_name = 'eventos'
+
+    def get_queryset(self):
+        return EventoFolga.objects.annotate(qtd_participantes=Count('lancamentos')).order_by('-data', '-criado_em')
+
+
+class EventoFolgaDetailView(LoginRequiredMixin, AdminRequiredMixin, DetailView):
+    model = EventoFolga
+    template_name = 'estoque/evento_folga_detail.html'
+    context_object_name = 'evento'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['participantes'] = self.object.lancamentos.select_related('funcionario').order_by('funcionario__nome')
+        return context
+
+
+class EventoFolgaCreateView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """
+    Registra o evento (ex: "Dia de Vacinação") e, para cada funcionário
+    marcado no checklist do template, cria um LancamentoFolga de crédito
+    apontando para este evento — é isso que dá "1 dia de folga" a cada
+    participante de uma vez.
+    """
+    template_name = 'estoque/evento_folga_form.html'
+
+    def get(self, request):
+        return render(request, self.template_name, {
+            'form': EventoFolgaForm(),
+            'funcionarios': Funcionario.objects.filter(ativo=True).select_related('unidade').order_by('nome'),
+        })
+
+    def post(self, request):
+        form = EventoFolgaForm(request.POST)
+        funcionario_ids = request.POST.getlist('funcionarios')
+
+        if not funcionario_ids:
+            form.add_error(None, 'Selecione pelo menos um funcionário participante.')
+
+        if form.is_valid() and funcionario_ids:
+            funcionarios = Funcionario.objects.filter(pk__in=funcionario_ids, ativo=True)
+            with transaction.atomic():
+                evento = form.save(commit=False)
+                evento.usuario = request.user
+                evento.save()
+                LancamentoFolga.objects.bulk_create([
+                    LancamentoFolga(
+                        funcionario=funcionario, tipo=LancamentoFolga.CREDITO, dias=evento.dias,
+                        data_referencia=evento.data, motivo=f'Evento: {evento.nome}',
+                        evento=evento, usuario=request.user,
+                    )
+                    for funcionario in funcionarios
+                ])
+            plural = 'dia' if evento.dias == 1 else 'dias'
+            messages.success(
+                request,
+                f'Evento "{evento.nome}" registrado: {funcionarios.count()} funcionário(s) '
+                f'receberam {evento.dias} {plural} de folga.',
+            )
+            return redirect(evento.get_absolute_url())
+
+        return render(request, self.template_name, {
+            'form': form,
+            'funcionarios': Funcionario.objects.filter(ativo=True).select_related('unidade').order_by('nome'),
+            'selecionados': {int(pk) for pk in funcionario_ids if pk.isdigit()},
+        })
 
 
 # ---------------------------------------------------------------------------
@@ -618,6 +696,8 @@ class RelatorioGerarView(LoginRequiredMixin, View):
         'entradas': 'entradas_do_periodo',
         'saidas': 'saidas_do_periodo',
         'por_categoria': 'estoque_por_categoria',
+        'saldo_folgas': 'saldo_de_dias_de_folga',
+        'lancamentos_folgas': 'lancamentos_de_folga_do_periodo',
     }
 
     def get(self, request, tipo):
@@ -637,6 +717,8 @@ class RelatorioGerarView(LoginRequiredMixin, View):
             'entradas': lambda: relatorios.relatorio_movimentacoes(unidade, data_inicio, data_fim, tipo=Movimentacao.ENTRADA),
             'saidas': lambda: relatorios.relatorio_movimentacoes(unidade, data_inicio, data_fim, tipo=Movimentacao.SAIDA),
             'por_categoria': lambda: relatorios.relatorio_por_categoria(unidade),
+            'saldo_folgas': lambda: relatorios.relatorio_saldo_folgas(unidade),
+            'lancamentos_folgas': lambda: relatorios.relatorio_lancamentos_folgas(unidade, data_inicio, data_fim),
         }
 
         gerar = geradores.get(tipo)
