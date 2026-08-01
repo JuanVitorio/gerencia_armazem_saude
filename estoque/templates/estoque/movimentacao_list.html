@@ -52,11 +52,13 @@
                 <thead>
                     <tr>
                         <th>Produto</th>
+                        <th>Unidade</th>
                         <th>Tipo</th>
                         <th>Qtd.</th>
                         <th>Motivo</th>
                         <th>Registrado por</th>
-                        <th class="text-end">Data e Hora</th>
+                        <th>Data e Hora</th>
+                        <th class="text-end">Opções</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -71,6 +73,13 @@
                             {% endif %}
                         </td>
                         <td>
+                            {% if mov.produto.unidade %}
+                                <span class="cat-tag"><i class="bi bi-building"></i> {{ mov.produto.unidade.nome }}</span>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
                             {% if mov.tipo == 'ENTRADA' %}
                                 <span class="mov-badge mov-entrada"><i class="bi bi-plus-lg"></i> Entrada</span>
                             {% else %}
@@ -80,11 +89,23 @@
                         <td class="fw-bold">{{ mov.quantidade }}</td>
                         <td class="text-muted small">{{ mov.motivo|default:'—' }}</td>
                         <td class="small"><i class="bi bi-person me-1 text-muted"></i>{{ mov.usuario|default:'—' }}</td>
-                        <td class="text-end text-muted small">{{ mov.data|date:'d/m/Y H:i' }}</td>
+                        <td class="text-muted small">{{ mov.data|date:'d/m/Y H:i' }}</td>
+                        <td class="text-end">
+                            <div class="btn-group-compact">
+                                <a href="{% url 'estoque:movimentacao_detail' mov.pk %}" class="btn-icon" title="Ver detalhes"
+                                   id="btn-ver-mov-{{ mov.pk }}">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a href="{% url 'estoque:movimentacao_delete' mov.pk %}" class="btn-icon btn-icon-danger" title="Excluir e estornar"
+                                   id="btn-excluir-mov-{{ mov.pk }}">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </div>
+                        </td>
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="6">
+                        <td colspan="8">
                             <div class="empty-state-inline">
                                 <i class="bi bi-arrow-down-up text-muted"></i>
                                 <p>Nenhuma movimentação encontrada.</p>

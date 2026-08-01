@@ -36,14 +36,10 @@
             <span class="stat-mini-value">{{ total_produtos }}</span>
             <span class="stat-mini-label"><i class="bi bi-box-seam"></i> Produtos</span>
         </a>
-        {% comment %}
-        TODO: revisar se o contador de "Estoque Baixo" é realmente necessário no dashboard.
-        Comentado por enquanto a pedido — não excluir, só reavaliar.
         <a href="{% url 'estoque:produto_list' %}?situacao=BAIXO" class="stat-mini {% if total_estoque_baixo > 0 %}stat-mini-danger{% endif %}">
             <span class="stat-mini-value">{{ total_estoque_baixo }}</span>
             <span class="stat-mini-label"><i class="bi bi-exclamation-triangle"></i> Estoque Baixo</span>
         </a>
-        {% endcomment %}
         <a href="{% url 'estoque:produto_list' %}?situacao=VENCIDO" class="stat-mini {% if total_vencidos > 0 %}stat-mini-danger{% endif %}">
             <span class="stat-mini-value">{{ total_vencidos }}</span>
             <span class="stat-mini-label"><i class="bi bi-calendar-x"></i> Vencidos</span>
@@ -57,9 +53,6 @@
     <!-- Grid principal -->
     <div class="dashboard-grid">
 
-        {% comment %}
-        TODO: revisar se o card de "Estoque Baixo" é realmente necessário no dashboard.
-        Comentado por enquanto a pedido — não excluir, só reavaliar.
         <!-- Coluna 1: Estoque Baixo -->
         <div class="dash-card">
             <div class="dash-card-header dash-card-danger">
@@ -91,7 +84,6 @@
             </div>
             {% endif %}
         </div>
-        {% endcomment %}
 
         <!-- Coluna 2: Validade -->
         <div class="dash-card">
