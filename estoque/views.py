@@ -605,6 +605,47 @@ class UsuarioUpdateView(LoginRequiredMixin, AdminRequiredMixin, View):
         })
 
 
+class UsuarioDeleteView(LoginRequiredMixin, AdminRequiredMixin, DeleteView):
+    """
+    Exclui uma conta de usuário do sistema. O PerfilUsuario relacionado é
+    apagado junto (OneToOneField com on_delete=CASCADE); movimentações,
+    lançamentos de folga e eventos que esse usuário registrou NÃO são
+    apagados — o campo `usuario` deles vira NULL (on_delete=SET_NULL nos
+    respectivos models), preservando o histórico ("Usuário removido").
+
+    Duas travas de segurança:
+      - Não deixa o usuário logado excluir a própria conta (evita se
+        trancar fora do sistema sem querer).
+      - Não deixa excluir contas de superusuário por aqui — essas são a
+        conta "raiz" do Django e devem ser geridas pelo /admin/ ou shell.
+    """
+    model = User
+    template_name = 'estoque/confirm_delete.html'
+    success_url = reverse_lazy('estoque:usuario_list')
+
+    def get_queryset(self):
+        return User.objects.select_related('perfil')
+
+    def form_valid(self, form):
+        usuario = self.object
+
+        if usuario.pk == self.request.user.pk:
+            messages.error(self.request, 'Você não pode excluir a própria conta.')
+            return redirect('estoque:usuario_list')
+
+        if usuario.is_superuser:
+            messages.error(
+                self.request,
+                'Contas de superusuário não podem ser excluídas por aqui — use o Django Admin.',
+            )
+            return redirect('estoque:usuario_list')
+
+        username = usuario.username
+        response = super().form_valid(form)
+        messages.success(self.request, f'Usuário "{username}" excluído com sucesso.')
+        return response
+
+
 # ---------------------------------------------------------------------------
 # Banco de Dias de Folga (apenas Admin/RH)
 # ---------------------------------------------------------------------------
@@ -678,13 +719,27 @@ class FuncionarioUpdateView(LoginRequiredMixin, AdminRequiredMixin, UpdateView):
 
 
 class FuncionarioDeleteView(LoginRequiredMixin, AdminRequiredMixin, DeleteView):
+    """
+    Exclui um funcionário e, junto, TODOS os lançamentos de folga dele
+    (Funcionario -> LancamentoFolga é on_delete=CASCADE) — o template
+    próprio (funcionario_confirm_delete.html) avisa quantos lançamentos e
+    qual saldo serão perdidos antes de confirmar, já que aqui não dá pra
+    reverter como no estoque.
+    """
     model = Funcionario
-    template_name = 'estoque/confirm_delete.html'
+    template_name = 'estoque/funcionario_confirm_delete.html'
     success_url = reverse_lazy('estoque:funcionario_list')
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['total_lancamentos'] = self.object.lancamentos.count()
+        return context
+
     def form_valid(self, form):
-        messages.success(self.request, 'Funcionário removido com sucesso.')
-        return super().form_valid(form)
+        nome = self.object.nome
+        response = super().form_valid(form)
+        messages.success(self.request, f'Funcionário "{nome}" e seus lançamentos de folga foram excluídos.')
+        return response
 
 
 class LancamentoFolgaCreateView(LoginRequiredMixin, AdminRequiredMixin, CreateView):
@@ -801,6 +856,100 @@ class EventoFolgaCreateView(LoginRequiredMixin, AdminRequiredMixin, View):
             'form': form,
             'funcionarios': Funcionario.objects.filter(ativo=True).select_related('unidade').order_by('nome'),
             'selecionados': {int(pk) for pk in funcionario_ids if pk.isdigit()},
+        })
+
+
+class EventoFolgaUpdateView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """
+    Edita um evento já registrado — inclusive adicionando ou removendo
+    funcionários participantes — sem precisar excluir e recriar o evento.
+
+    Regras ao salvar:
+      - Campos do evento (nome/data/descrição/dias) são atualizados normalmente.
+      - Funcionário que foi MARCADO agora e ainda não tinha lançamento
+        deste evento → ganha um LancamentoFolga de crédito novo.
+      - Funcionário que tinha lançamento deste evento e foi DESMARCADO →
+        o lançamento é excluído. O saldo dele se ajusta sozinho, porque
+        Funcionario.saldo_dias soma o histórico ao vivo — não precisa de
+        nenhum "estorno" manual como no estoque.
+      - Funcionário que CONTINUA marcado tem o lançamento sincronizado com
+        os campos atuais do evento (dias/data), caso o admin tenha
+        corrigido algum deles.
+    """
+    template_name = 'estoque/evento_folga_form.html'
+
+    def get_object(self, pk):
+        return get_object_or_404(EventoFolga, pk=pk)
+
+    def _funcionarios_para_checklist(self, participantes_ids):
+        # Sempre inclui quem já participa do evento, mesmo que tenha sido
+        # desativado depois — senão ele "desaparece" do checklist e seria
+        # removido do evento sem o admin ter escolhido isso.
+        return Funcionario.objects.filter(
+            Q(ativo=True) | Q(pk__in=participantes_ids)
+        ).select_related('unidade').order_by('nome').distinct()
+
+    def get(self, request, pk):
+        evento = self.get_object(pk)
+        participantes_ids = set(evento.lancamentos.values_list('funcionario_id', flat=True))
+        return render(request, self.template_name, {
+            'form': EventoFolgaForm(instance=evento),
+            'funcionarios': self._funcionarios_para_checklist(participantes_ids),
+            'selecionados': participantes_ids,
+            'evento': evento,
+        })
+
+    def post(self, request, pk):
+        evento = self.get_object(pk)
+        form = EventoFolgaForm(request.POST, instance=evento)
+        funcionario_ids = {int(v) for v in request.POST.getlist('funcionarios') if v.isdigit()}
+
+        if not funcionario_ids:
+            form.add_error(None, 'Selecione pelo menos um funcionário participante.')
+
+        if form.is_valid() and funcionario_ids:
+            with transaction.atomic():
+                evento = form.save()
+
+                ids_atuais = set(evento.lancamentos.values_list('funcionario_id', flat=True))
+                remover_ids = ids_atuais - funcionario_ids
+                adicionar_ids = funcionario_ids - ids_atuais
+                manter_ids = ids_atuais & funcionario_ids
+
+                if remover_ids:
+                    LancamentoFolga.objects.filter(
+                        evento=evento, funcionario_id__in=remover_ids,
+                    ).delete()
+
+                if adicionar_ids:
+                    novos_funcionarios = Funcionario.objects.filter(pk__in=adicionar_ids)
+                    LancamentoFolga.objects.bulk_create([
+                        LancamentoFolga(
+                            funcionario=funcionario, tipo=LancamentoFolga.CREDITO, dias=evento.dias,
+                            data_referencia=evento.data, motivo=f'Evento: {evento.nome}',
+                            evento=evento, usuario=request.user,
+                        )
+                        for funcionario in novos_funcionarios
+                    ])
+
+                if manter_ids:
+                    LancamentoFolga.objects.filter(
+                        evento=evento, funcionario_id__in=manter_ids,
+                    ).update(dias=evento.dias, data_referencia=evento.data)
+
+            messages.success(
+                request,
+                f'Evento "{evento.nome}" atualizado — {len(funcionario_ids)} participante(s), '
+                f'{len(adicionar_ids)} adicionado(s), {len(remover_ids)} removido(s).',
+            )
+            return redirect(evento.get_absolute_url())
+
+        participantes_ids = set(evento.lancamentos.values_list('funcionario_id', flat=True))
+        return render(request, self.template_name, {
+            'form': form,
+            'funcionarios': self._funcionarios_para_checklist(participantes_ids | funcionario_ids),
+            'selecionados': funcionario_ids,
+            'evento': evento,
         })
 
 
