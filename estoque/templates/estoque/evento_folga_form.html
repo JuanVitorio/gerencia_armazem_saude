@@ -1,0 +1,219 @@
+{% extends 'estoque/base.html' %}
+{% block title %}{% if evento %}Editar Evento{% else %}Registrar Evento{% endif %} — Banco de Dias de Folga{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">
+                {% if evento %}
+                    <i class="bi bi-pencil-square text-primary"></i> Editar Evento de Folga
+                {% else %}
+                    <i class="bi bi-calendar-plus text-primary"></i> Registrar Evento de Folga
+                {% endif %}
+            </h1>
+            <p class="page-subtitle">
+                {% if evento %}
+                    Ajuste os dados do evento e marque/desmarque participantes — quem for
+                    desmarcado tem o crédito de folga referente a este evento removido, e
+                    quem for marcado agora recebe o crédito na hora. Nada aqui exige recriar o evento.
+                {% else %}
+                    Ex: "Dia de Vacinação" — registre o evento e marque quem participou.
+                    Cada funcionário selecionado recebe os dias de folga automaticamente.
+                {% endif %}
+            </p>
+        </div>
+        <a href="{% if evento %}{{ evento.get_absolute_url }}{% else %}{% url 'estoque:evento_folga_list' %}{% endif %}"
+           class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Voltar
+        </a>
+    </div>
+
+    <form method="post" novalidate id="form-evento">
+        {% csrf_token %}
+
+        {% for error in form.non_field_errors %}
+        <div class="alert-inline alert-inline-danger">
+            <i class="bi bi-exclamation-octagon-fill"></i> {{ error }}
+        </div>
+        {% endfor %}
+
+        <div class="form-card" style="max-width: 760px;">
+            <div class="form-row">
+                <div class="form-col-full">
+                    <label for="{{ form.nome.id_for_label }}" class="form-label-compact">
+                        Nome do evento <span class="req">*</span>
+                    </label>
+                    {{ form.nome }}
+                    {% for e in form.nome.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-col-sm">
+                    <label for="{{ form.data.id_for_label }}" class="form-label-compact">
+                        Data do evento <span class="req">*</span>
+                    </label>
+                    {{ form.data }}
+                    {% for e in form.data.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="form-col-sm">
+                    <label for="{{ form.dias.id_for_label }}" class="form-label-compact">
+                        Dias de folga por participante <span class="req">*</span>
+                    </label>
+                    {{ form.dias }}
+                    {% if form.dias.help_text %}<div class="form-hint">{{ form.dias.help_text }}</div>{% endif %}
+                    {% for e in form.dias.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-col-full">
+                    <label for="{{ form.descricao.id_for_label }}" class="form-label-compact">
+                        Descrição <span class="form-hint">(opcional)</span>
+                    </label>
+                    {{ form.descricao }}
+                    {% for e in form.descricao.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="table-card" style="max-width: 760px; margin-top: 1rem;">
+            <div class="table-card-header">
+                <h2 class="table-card-title">
+                    <i class="bi bi-people text-primary me-1"></i> Funcionários participantes
+                    <span class="badge text-bg-primary" id="contador-selecionados">0</span>
+                </h2>
+            </div>
+
+            <div style="padding: 0.75rem 1rem 0;">
+                <div class="filter-field filter-field-grow" style="margin-bottom: 0.75rem;">
+                    <i class="bi bi-search filter-icon"></i>
+                    <input type="text" id="busca-funcionario" class="form-control"
+                           placeholder="Pesquisar por nome, cargo ou unidade...">
+                </div>
+                <div class="d-flex gap-2 mb-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-marcar-visiveis">
+                        <i class="bi bi-check-all"></i> Marcar todos filtrados
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-limpar-selecao">
+                        <i class="bi bi-x-lg"></i> Limpar seleção
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-responsive" style="max-height: 420px; overflow-y: auto;">
+                <table class="data-table" id="tabela-participantes">
+                    <thead>
+                        <tr>
+                            <th style="width: 2.5rem;"></th>
+                            <th>Nome</th>
+                            <th>Cargo</th>
+                            <th>Unidade</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for funcionario in funcionarios %}
+                        <tr class="linha-funcionario"
+                            data-busca="{{ funcionario.nome|lower }} {{ funcionario.cargo|lower }} {{ funcionario.unidade.nome|default:''|lower }}">
+                            <td>
+                                <input type="checkbox" class="form-check-input chk-funcionario" name="funcionarios"
+                                       value="{{ funcionario.pk }}" id="func-{{ funcionario.pk }}"
+                                       {% if funcionario.pk in selecionados %}checked{% endif %}>
+                            </td>
+                            <td>
+                                <label for="func-{{ funcionario.pk }}" class="item-link-dark" style="cursor: pointer;">
+                                    {{ funcionario.nome }}
+                                </label>
+                                {% if not funcionario.ativo %}
+                                    <span class="status-tag status-muted">Inativo</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ funcionario.cargo|default:'—' }}</td>
+                            <td>{{ funcionario.unidade|default:'—' }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="4">
+                                <div class="empty-state-inline">
+                                    <i class="bi bi-people text-muted"></i>
+                                    <p>Nenhum funcionário ativo cadastrado.</p>
+                                    <a href="{% url 'estoque:funcionario_create' %}" class="btn btn-primary btn-sm">
+                                        <i class="bi bi-plus-lg"></i> Cadastrar Funcionário
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="form-actions" style="max-width: 760px;">
+            <button type="submit" class="btn btn-success">
+                {% if evento %}
+                    <i class="bi bi-check-circle-fill"></i> Salvar Alterações
+                {% else %}
+                    <i class="bi bi-check-circle-fill"></i> Registrar Evento e Conceder Folga
+                {% endif %}
+            </button>
+            <a href="{% if evento %}{{ evento.get_absolute_url }}{% else %}{% url 'estoque:evento_folga_list' %}{% endif %}"
+               class="btn btn-outline-secondary">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+    var campoBusca = document.getElementById('busca-funcionario');
+    var linhas = document.querySelectorAll('.linha-funcionario');
+    var checkboxes = document.querySelectorAll('.chk-funcionario');
+    var contador = document.getElementById('contador-selecionados');
+    var btnMarcarVisiveis = document.getElementById('btn-marcar-visiveis');
+    var btnLimparSelecao = document.getElementById('btn-limpar-selecao');
+
+    function atualizarContador() {
+        var total = document.querySelectorAll('.chk-funcionario:checked').length;
+        if (contador) { contador.textContent = total; }
+    }
+
+    if (campoBusca) {
+        campoBusca.addEventListener('input', function () {
+            var termo = campoBusca.value.trim().toLowerCase();
+            linhas.forEach(function (linha) {
+                var alvo = linha.getAttribute('data-busca') || '';
+                linha.style.display = alvo.indexOf(termo) !== -1 ? '' : 'none';
+            });
+        });
+    }
+
+    checkboxes.forEach(function (chk) {
+        chk.addEventListener('change', atualizarContador);
+    });
+
+    if (btnMarcarVisiveis) {
+        btnMarcarVisiveis.addEventListener('click', function () {
+            linhas.forEach(function (linha) {
+                if (linha.style.display !== 'none') {
+                    var chk = linha.querySelector('.chk-funcionario');
+                    if (chk) { chk.checked = true; }
+                }
+            });
+            atualizarContador();
+        });
+    }
+
+    if (btnLimparSelecao) {
+        btnLimparSelecao.addEventListener('click', function () {
+            checkboxes.forEach(function (chk) { chk.checked = false; });
+            atualizarContador();
+        });
+    }
+
+    atualizarContador();
+})();
+</script>
+{% endblock %}

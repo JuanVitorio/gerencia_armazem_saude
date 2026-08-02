@@ -1,74 +1,114 @@
 {% extends 'estoque/base.html' %}
-{% block title %}Movimentações de Estoque{% endblock %}
+{% load humanize %}
+{% block title %}Movimentações — Gestão de Estoque{% endblock %}
 
 {% block content %}
-<!-- Cabeçalho -->
-<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4 pb-3 border-bottom">
-    <div>
-        <h1 class="h2 mb-1 d-flex align-items-center gap-2">
-            <i class="bi bi-arrow-down-up text-primary"></i>
-            Movimentações de Estoque
-        </h1>
-        <p class="text-muted fs-5 mb-0">Histórico completo de todas as entradas e saídas de itens no armazém.</p>
-    </div>
-    <a href="{% url 'estoque:movimentacao_create' %}" class="btn btn-success btn-lg shadow-sm">
-        <i class="bi bi-plus-circle-fill"></i> Registrar Nova Movimentação
-    </a>
-</div>
+<div class="page-container">
 
-<!-- Tabela de Movimentações -->
-<div class="card-custom shadow-sm mb-4">
-    <div class="card-custom-body p-0">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">
+                <i class="bi bi-arrow-down-up text-primary"></i> Movimentações
+            </h1>
+            <p class="page-subtitle">Histórico completo de entradas e saídas de estoque.</p>
+        </div>
+        <a href="{% url 'estoque:movimentacao_create' %}" class="btn btn-success btn-sm" id="btn-nova-movimentacao">
+            <i class="bi bi-plus-lg"></i> Nova Movimentação
+        </a>
+    </div>
+
+    <!-- Filtros -->
+    <div class="filter-bar">
+        <form method="get" class="filter-form" id="form-filtro-movimentacoes">
+            <div class="filter-field filter-field-grow">
+                <i class="bi bi-search filter-icon"></i>
+                {{ filtro_form.q }}
+            </div>
+            <div class="filter-field">
+                {{ filtro_form.tipo }}
+            </div>
+            <div class="filter-field">
+                <label class="filter-label">De</label>
+                {{ filtro_form.data_inicio }}
+            </div>
+            <div class="filter-field">
+                <label class="filter-label">Até</label>
+                {{ filtro_form.data_fim }}
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm" id="btn-filtrar-mov">
+                <i class="bi bi-filter"></i> Filtrar
+            </button>
+            {% if request.GET %}
+            <a href="{% url 'estoque:movimentacao_list' %}" class="btn btn-outline-secondary btn-sm" title="Limpar">
+                <i class="bi bi-x-lg"></i>
+            </a>
+            {% endif %}
+        </form>
+    </div>
+
+    <div class="table-card">
         <div class="table-responsive">
-            <table class="table table-custom align-middle mb-0">
+            <table class="data-table" id="tabela-movimentacoes">
                 <thead>
                     <tr>
                         <th>Produto</th>
-                        <th>Tipo de Movimentação</th>
-                        <th>Quantidade</th>
-                        <th>Motivo / Observação</th>
+                        <th>Unidade</th>
+                        <th>Tipo</th>
+                        <th>Qtd.</th>
+                        <th>Motivo</th>
                         <th>Registrado por</th>
-                        <th class="text-end">Data e Hora</th>
+                        <th>Data e Hora</th>
+                        <th class="text-end">Opções</th>
                     </tr>
                 </thead>
                 <tbody>
                 {% for mov in movimentacoes %}
                     <tr>
                         <td>
-                            <a href="{{ mov.produto.get_absolute_url }}" class="fw-bold text-decoration-none text-dark fs-5">
+                            <a href="{{ mov.produto.get_absolute_url }}" class="item-link-dark">
                                 {{ mov.produto.nome }}
                             </a>
+                            {% if mov.produto.categoria %}
+                            <span class="cat-tag">{{ mov.produto.categoria.nome }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if mov.produto.unidade %}
+                                <span class="cat-tag"><i class="bi bi-building"></i> {{ mov.produto.unidade.nome }}</span>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
                         </td>
                         <td>
                             {% if mov.tipo == 'ENTRADA' %}
-                                <span class="badge badge-success-custom fs-6">
-                                    <i class="bi bi-arrow-down-left-circle-fill"></i> Entrada (+ estoque)
-                                </span>
+                                <span class="mov-badge mov-entrada"><i class="bi bi-plus-lg"></i> Entrada</span>
                             {% else %}
-                                <span class="badge badge-danger-custom fs-6">
-                                    <i class="bi bi-arrow-up-right-circle-fill"></i> Saída (- estoque)
-                                </span>
+                                <span class="mov-badge mov-saida"><i class="bi bi-dash-lg"></i> Saída</span>
                             {% endif %}
                         </td>
-                        <td class="fw-bold fs-5 text-dark">
-                            {{ mov.quantidade }} un.
-                        </td>
-                        <td class="text-muted fs-6">
-                            {{ mov.motivo|default:'-' }}
-                        </td>
-                        <td class="fw-semibold text-dark fs-6">
-                            <i class="bi bi-person me-1"></i> {{ mov.usuario|default:'-' }}
-                        </td>
-                        <td class="text-end text-muted fs-6">
-                            <i class="bi bi-clock me-1"></i> {{ mov.data }}
+                        <td class="fw-bold">{{ mov.quantidade }}</td>
+                        <td class="text-muted small">{{ mov.motivo|default:'—' }}</td>
+                        <td class="small"><i class="bi bi-person me-1 text-muted"></i>{{ mov.usuario|default:'—' }}</td>
+                        <td class="text-muted small">{{ mov.data|date:'d/m/Y H:i' }}</td>
+                        <td class="text-end">
+                            <div class="btn-group-compact">
+                                <a href="{% url 'estoque:movimentacao_detail' mov.pk %}" class="btn-icon" title="Ver detalhes"
+                                   id="btn-ver-mov-{{ mov.pk }}">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a href="{% url 'estoque:movimentacao_delete' mov.pk %}" class="btn-icon btn-icon-danger" title="Excluir e estornar"
+                                   id="btn-excluir-mov-{{ mov.pk }}">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </div>
                         </td>
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="6">
-                            <div class="empty-state">
-                                <i class="bi bi-arrow-down-up"></i>
-                                <p class="fs-5 text-muted fw-bold">Nenhuma movimentação registrada até o momento.</p>
+                        <td colspan="8">
+                            <div class="empty-state-inline">
+                                <i class="bi bi-arrow-down-up text-muted"></i>
+                                <p>Nenhuma movimentação encontrada.</p>
                             </div>
                         </td>
                     </tr>
@@ -77,7 +117,8 @@
             </table>
         </div>
     </div>
-</div>
 
-{% include 'estoque/_paginacao.html' %}
+    {% include 'estoque/_paginacao.html' %}
+
+</div>
 {% endblock %}

@@ -1,0 +1,312 @@
+{% extends 'estoque/base.html' %}
+{% block title %}{{ unidade.nome }} — Detalhes da Unidade{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <h1 class="page-title mb-0">{{ unidade.nome }}</h1>
+                <span class="cat-tag">{{ unidade.get_tipo_display }}</span>
+                {% if unidade.ativa %}
+                    <span class="status-tag status-success">Ativa</span>
+                {% else %}
+                    <span class="status-tag status-muted">Inativa</span>
+                {% endif %}
+            </div>
+            {% if unidade.descricao %}
+            <p class="page-subtitle">{{ unidade.descricao }}</p>
+            {% endif %}
+        </div>
+        <div class="page-actions">
+            <a href="{% url 'estoque:unidade_update' unidade.pk %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-pencil"></i> Editar Unidade
+            </a>
+            <a href="{% url 'estoque:unidade_list' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Voltar
+            </a>
+        </div>
+    </div>
+
+    <div class="detail-stats">
+        <div class="detail-stat">
+            <span class="detail-stat-label">Produtos em Estoque</span>
+            <span class="detail-stat-value">{{ total_produtos }}</span>
+        </div>
+        <div class="detail-stat">
+            <span class="detail-stat-label">Usuários Vinculados</span>
+            <span class="detail-stat-value">{{ membros|length }}</span>
+        </div>
+        <div class="detail-stat">
+            <span class="detail-stat-label">Funcionários (Banco de Folga)</span>
+            <span class="detail-stat-value">{{ funcionarios_unidade|length }}</span>
+        </div>
+    </div>
+
+    <!-- Estoque desta unidade, pesquisável -->
+    <div class="table-card mt-3">
+        <div class="table-card-header">
+            <h2 class="table-card-title"><i class="bi bi-box-seam text-primary me-1"></i> Estoque de {{ unidade.nome }}</h2>
+            <a href="{% url 'estoque:produto_create' %}" class="btn btn-primary btn-sm">
+                <i class="bi bi-plus-lg"></i> Cadastrar Produto
+            </a>
+        </div>
+
+        <div class="filter-bar">
+            <form method="get" class="filter-form" id="form-filtro-estoque-unidade">
+                <div class="filter-field filter-field-grow">
+                    <i class="bi bi-search filter-icon"></i>
+                    {{ filtro_form.q }}
+                </div>
+                <div class="filter-field">
+                    {{ filtro_form.categoria }}
+                </div>
+                <div class="filter-field">
+                    {{ filtro_form.situacao }}
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm" id="btn-filtrar-estoque-unidade">
+                    <i class="bi bi-filter"></i> Filtrar
+                </button>
+                {% if request.GET %}
+                <a href="{% url 'estoque:unidade_detail' unidade.pk %}" class="btn btn-outline-secondary btn-sm" title="Limpar filtros">
+                    <i class="bi bi-x-lg"></i>
+                </a>
+                {% endif %}
+            </form>
+        </div>
+
+        <div class="table-responsive">
+            <table class="data-table" id="tabela-estoque-unidade">
+                <thead>
+                    <tr>
+                        <th>Produto</th>
+                        <th>Categoria</th>
+                        <th>Qtd.</th>
+                        <th>Validade</th>
+                        <th class="col-acao-rapida">Ação Rápida</th>
+                        <th class="text-end">Opções</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for produto in produtos %}
+                    <tr class="{% if produto.vencido %}row-vencido{% elif produto.estoque_baixo %}row-alerta{% endif %}">
+                        <td>
+                            <a href="{{ produto.get_absolute_url }}" class="item-link-dark">
+                                {{ produto.nome }}
+                            </a>
+                            {% if produto.detalhes %}
+                            <span class="item-detail">{{ produto.detalhes }}</span>
+                            {% endif %}
+                            {% if produto.sku %}<span class="item-code"><i class="bi bi-upc"></i> {{ produto.sku }}</span>{% endif %}
+                        </td>
+                        <td>
+                            {% if produto.categoria %}
+                            <span class="cat-tag">{{ produto.categoria.nome }}</span>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="qty-text {% if produto.estoque_baixo %}qty-text-danger{% endif %}">
+                                {{ produto.quantidade }}
+                                <small>{{ produto.get_unidade_medida_display }}</small>
+                            </span>
+                            {% if produto.estoque_baixo %}
+                            <span class="status-tag status-danger">Baixo</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if produto.data_validade %}
+                                {% if produto.vencido %}
+                                    <span class="status-tag status-danger">
+                                        <i class="bi bi-x-circle"></i> Vencido
+                                    </span>
+                                {% elif produto.venc_proximo %}
+                                    <span class="status-tag status-warning">
+                                        <i class="bi bi-clock"></i> {{ produto.data_validade|date:'d/m/Y' }}
+                                    </span>
+                                {% else %}
+                                    <span class="date-text">{{ produto.data_validade|date:'d/m/Y' }}</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <form action="{% url 'estoque:movimentacao_rapida' produto.pk %}" method="post"
+                                  class="acao-rapida-form" id="form-rapida-unidade-{{ produto.pk }}">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                <input type="number" name="quantidade" value="1" min="1" max="9999"
+                                       class="acao-rapida-qty" title="Quantidade" aria-label="Quantidade">
+                                <button type="submit" name="tipo" value="ENTRADA"
+                                        class="btn-entrada" title="Dar entrada no estoque"
+                                        id="btn-entrada-unidade-{{ produto.pk }}">
+                                    <i class="bi bi-plus-lg"></i>
+                                </button>
+                                <button type="submit" name="tipo" value="SAIDA"
+                                        class="btn-saida" title="Registrar saída do estoque"
+                                        id="btn-saida-unidade-{{ produto.pk }}">
+                                    <i class="bi bi-dash-lg"></i>
+                                </button>
+                            </form>
+                        </td>
+                        <td class="text-end">
+                            <div class="btn-group-compact">
+                                <a href="{{ produto.get_absolute_url }}"
+                                   class="btn-icon" title="Ver detalhes"
+                                   id="btn-ver-unidade-{{ produto.pk }}">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a href="{% url 'estoque:produto_update' produto.pk %}"
+                                   class="btn-icon" title="Editar"
+                                   id="btn-editar-unidade-{{ produto.pk }}">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state-inline">
+                                <i class="bi bi-inbox"></i>
+                                <p>
+                                    {% if request.GET.q or request.GET.categoria or request.GET.situacao %}
+                                        Nenhum produto encontrado para essa busca nesta unidade.
+                                    {% else %}
+                                        Nenhum produto cadastrado nesta unidade ainda.
+                                    {% endif %}
+                                </p>
+                                <a href="{% url 'estoque:produto_create' %}" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-plus-lg"></i> Cadastrar Produto
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% include 'estoque/_paginacao.html' %}
+    </div>
+
+    <div class="table-card mt-3">
+        <div class="table-card-header">
+            <h2 class="table-card-title"><i class="bi bi-person-badge text-primary me-1"></i> Usuários com Acesso</h2>
+            <span class="text-muted small">Pessoas que fazem login no sistema para esta unidade.</span>
+        </div>
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Usuário</th>
+                        <th>Nome Completo</th>
+                        <th>E-mail</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for membro in membros %}
+                    <tr>
+                        <td>
+                            <span class="fw-bold">{{ membro.usuario.username }}</span>
+                        </td>
+                        <td>{{ membro.usuario.get_full_name|default:'—' }}</td>
+                        <td>{{ membro.usuario.email|default:'—' }}</td>
+                        <td>
+                            {% if membro.usuario.is_active %}
+                                <span class="status-tag status-success">Ativo</span>
+                            {% else %}
+                                <span class="status-tag status-muted">Inativo</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="4">
+                            <div class="empty-state-inline">
+                                <i class="bi bi-people text-muted"></i>
+                                <p>Nenhum usuário vinculado a esta unidade.</p>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Funcionários (banco de dias de folga) desta unidade -->
+    <div class="table-card mt-3">
+        <div class="table-card-header">
+            <h2 class="table-card-title"><i class="bi bi-calendar-heart text-primary me-1"></i> Funcionários (Banco de Dias de Folga)</h2>
+            <a href="{% url 'estoque:funcionario_create' %}?unidade={{ unidade.pk }}" class="btn btn-primary btn-sm">
+                <i class="bi bi-person-plus"></i> Novo Funcionário
+            </a>
+        </div>
+        <p class="text-muted small px-3">
+            Funcionários cadastrados pelo administrador (não fazem login) para controle de dias de folga —
+            ex: quem participou de um evento como "Dia de Vacinação".
+        </p>
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Cargo</th>
+                        <th class="text-end">Saldo</th>
+                        <th class="text-end">Opções</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for funcionario in funcionarios_unidade %}
+                    <tr>
+                        <td>
+                            <a href="{{ funcionario.get_absolute_url }}" class="item-link-dark">{{ funcionario.nome }}</a>
+                            {% if funcionario.matricula %}
+                                <div class="text-muted small">Mat. {{ funcionario.matricula }}</div>
+                            {% endif %}
+                        </td>
+                        <td>{{ funcionario.cargo|default:'—' }}</td>
+                        <td class="text-end">
+                            {% if funcionario.saldo_dias > 0 %}
+                                <span class="qty-badge">+{{ funcionario.saldo_dias }} dia{{ funcionario.saldo_dias|pluralize }}</span>
+                            {% elif funcionario.saldo_dias < 0 %}
+                                <span class="qty-badge qty-badge-danger">{{ funcionario.saldo_dias }} dia{{ funcionario.saldo_dias|pluralize }}</span>
+                            {% else %}
+                                <span class="text-muted">0 dia</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <div class="btn-group-compact">
+                                <a href="{% url 'estoque:lancamento_create' %}?funcionario={{ funcionario.pk }}"
+                                   class="btn-icon" title="Lançamento manual">
+                                    <i class="bi bi-plus-slash-minus"></i>
+                                </a>
+                                <a href="{{ funcionario.get_absolute_url }}" class="btn-icon" title="Ver">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="4">
+                            <div class="empty-state-inline">
+                                <i class="bi bi-calendar-heart text-muted"></i>
+                                <p>Nenhum funcionário vinculado a esta unidade.</p>
+                                <a href="{% url 'estoque:funcionario_create' %}?unidade={{ unidade.pk }}" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-plus-lg"></i> Cadastrar Funcionário
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,62 +1,140 @@
 {% extends 'estoque/base.html' %}
-{% block title %}{% if object %}Editar{% else %}Novo{% endif %} Produto — Gestão de Estoque{% endblock %}
+{% block title %}{% if object %}Editar{% else %}Novo Produto{% endif %} — Gestão de Estoque{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-lg-10">
-        <!-- Cabeçalho -->
-        <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
-            <div>
-                <h1 class="h2 mb-1 d-flex align-items-center gap-2">
-                    <i class="bi bi-box-seam-fill text-primary"></i>
-                    {% if object %}Editar{% else %}Novo{% endif %} Produto
-                </h1>
-                <p class="text-muted fs-5 mb-0">Preencha os campos abaixo. Itens com <span class="text-danger fw-bold">*</span> são obrigatórios.</p>
-            </div>
-            <a href="{% url 'estoque:produto_list' %}" class="btn btn-outline-secondary btn-lg">
-                <i class="bi bi-arrow-left"></i> Voltar à Lista
-            </a>
+<div class="page-container">
+
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">
+                <i class="bi bi-{% if object %}pencil-square{% else %}plus-circle{% endif %} text-primary"></i>
+                {% if object %}Editar Produto{% else %}Novo Produto{% endif %}
+            </h1>
+            {% if not object %}
+            <p class="page-subtitle">
+                <i class="bi bi-lightning-charge text-warning"></i>
+                Cadastro rápido — após salvar, o formulário é limpo automaticamente para o próximo item.
+            </p>
+            {% endif %}
         </div>
+        <a href="{% url 'estoque:produto_list' %}" class="btn btn-outline-secondary btn-sm" id="btn-voltar-lista">
+            <i class="bi bi-arrow-left"></i> Voltar à Lista
+        </a>
+    </div>
 
-        <div class="card-custom shadow-sm mb-5">
-            <div class="card-custom-body bg-white p-4">
-                <form method="post" novalidate>
-                    {% csrf_token %}
+    <div class="form-card">
+        <form method="post" novalidate id="form-produto">
+            {% csrf_token %}
 
-                    {% for error in form.non_field_errors %}
-                        <div class="alert alert-danger mb-4 shadow-sm">
-                            <i class="bi bi-exclamation-octagon-fill me-2"></i> {{ error }}
+            {% if form.non_field_errors %}
+            <div class="alert-inline alert-inline-danger">
+                {% for error in form.non_field_errors %}
+                <i class="bi bi-exclamation-octagon-fill"></i> {{ error }}
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Linha 1: Nome + Categoria -->
+            <div class="form-row">
+                <div class="form-col-lg">
+                    <label for="{{ form.nome.id_for_label }}" class="form-label-compact">
+                        Nome <span class="req">*</span>
+                    </label>
+                    {{ form.nome }}
+                    {% for e in form.nome.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="form-col-sm">
+                    <label for="{{ form.categoria.id_for_label }}" class="form-label-compact">
+                        Categoria <span class="req">*</span>
+                    </label>
+                    {{ form.categoria }}
+                    {% for e in form.categoria.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+            </div>
+
+            <!-- Linha 2: Detalhes -->
+            <div class="form-row" id="campo-detalhes">
+                <div class="form-col-full">
+                    <label for="{{ form.detalhes.id_for_label }}" class="form-label-compact">
+                        Detalhes <span class="form-hint">cor, tamanho, concentração, modelo...</span>
+                    </label>
+                    {{ form.detalhes }}
+                    {% for e in form.detalhes.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+            </div>
+
+            <!-- Linha 3: Quantidade + Unidade de medida -->
+            <div class="form-row">
+                <div class="form-col-sm">
+                    <label for="{{ form.quantidade.id_for_label }}" class="form-label-compact">
+                        Quantidade <span class="req">*</span>
+                    </label>
+                    {{ form.quantidade }}
+                    {% for e in form.quantidade.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="form-col-sm">
+                    <label for="{{ form.unidade_medida.id_for_label }}" class="form-label-compact">
+                        Unidade de Medida <span class="req">*</span>
+                    </label>
+                    {{ form.unidade_medida }}
+                    {% for e in form.unidade_medida.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+                <!-- Campos condicionais: Lote + Validade (rastreabilidade) -->
+                <div class="form-col-sm" id="campo-lote" style="display:none;">
+                    <label for="{{ form.lote.id_for_label }}" class="form-label-compact">Lote</label>
+                    {{ form.lote }}
+                    {% for e in form.lote.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="form-col-sm" id="campo-data_validade">
+                    <label for="{{ form.data_validade.id_for_label }}" class="form-label-compact">
+                        Data de Validade <span class="form-hint">opcional — vacinas, medicamentos etc.</span>
+                    </label>
+                    {{ form.data_validade }}
+                    {% for e in form.data_validade.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+            </div>
+
+            <!-- Campo condicional: Código/SKU (apenas para categorias que usam SKU) -->
+            <div class="form-row" id="campo-sku" style="display:none;">
+                <div class="form-col-sm">
+                    <label for="{{ form.sku.id_for_label }}" class="form-label-compact">
+                        Código / SKU <span class="form-hint">opcional</span>
+                    </label>
+                    {{ form.sku }}
+                    {% for e in form.sku.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+            </div>
+
+            <!-- Descrição/Observações (colapsável) -->
+            <div class="form-row">
+                <div class="form-col-full">
+                    <details {% if form.descricao.value %}open{% endif %}>
+                        <summary class="form-label-compact" style="cursor:pointer; user-select:none;">
+                            <i class="bi bi-chevron-right toggle-icon"></i>
+                            Observações adicionais <span class="form-hint">(opcional)</span>
+                        </summary>
+                        <div style="margin-top: 0.5rem;">
+                            {{ form.descricao }}
                         </div>
-                    {% endfor %}
-
-                    <div class="row g-3">
-                        {% for field in form %}
-                            <div class="col-md-6 mb-2" id="campo-{{ field.name }}">
-                                <label for="{{ field.id_for_label }}" class="form-label fs-5 fw-bold text-dark">
-                                    {{ field.label }}
-                                </label>
-                                {{ field }}
-                                {% if field.help_text %}
-                                    <div class="form-text fs-6"><i class="bi bi-info-circle text-muted me-1"></i> {{ field.help_text }}</div>
-                                {% endif %}
-                                {% for error in field.errors %}
-                                    <div class="text-danger fw-bold mt-1 fs-6"><i class="bi bi-x-circle-fill me-1"></i> {{ error }}</div>
-                                {% endfor %}
-                            </div>
-                        {% endfor %}
-                    </div>
-
-                    <div class="d-flex gap-3 mt-4 pt-3 border-top">
-                        <button type="submit" class="btn btn-primary btn-lg px-4 shadow-sm fw-bold">
-                            <i class="bi bi-check-circle-fill"></i> Salvar Produto
-                        </button>
-                        <a href="{% url 'estoque:produto_list' %}" class="btn btn-outline-secondary btn-lg px-4 fw-bold">
-                            Cancelar
-                        </a>
-                    </div>
-                </form>
+                    </details>
+                </div>
             </div>
-        </div>
+
+            <!-- Ações -->
+            <div class="form-actions">
+                {% if modo_rapido %}
+                <button type="submit" class="btn btn-primary" id="btn-salvar-produto">
+                    <i class="bi bi-check-circle-fill"></i> Salvar e Cadastrar Próximo
+                </button>
+                {% else %}
+                <button type="submit" class="btn btn-primary" id="btn-salvar-produto">
+                    <i class="bi bi-check-circle-fill"></i> Salvar Produto
+                </button>
+                {% endif %}
+                <a href="{% url 'estoque:produto_list' %}" class="btn btn-outline-secondary">Cancelar</a>
+            </div>
+
+        </form>
     </div>
 </div>
 {% endblock %}
@@ -64,35 +142,43 @@
 {% block extra_scripts %}
 <script>
 (function () {
-    // Campos que aparecem/somem dependendo do tipo da categoria escolhida.
-    var CAMPOS_CONDICIONAIS = ['sku', 'codigo_barras', 'fornecedor', 'lote', 'data_validade'];
-    var CAMPOS_POR_TIPO = {
-        ALIMENTO: ['fornecedor', 'data_validade'],
-        MEDICAMENTO: ['sku', 'codigo_barras', 'fornecedor', 'lote', 'data_validade'],
-        VACINA: ['sku', 'codigo_barras', 'lote', 'data_validade'],
-        MATERIAL_ESCRITORIO: ['sku', 'codigo_barras', 'fornecedor'],
-        MATERIAL_LIMPEZA: ['sku', 'codigo_barras', 'fornecedor', 'data_validade'],
-        OUTRO: CAMPOS_CONDICIONAIS
-    };
+    // Tipos que mostram rastreabilidade (lote)
+    var TIPOS_RASTREABILIDADE = ['MEDICAMENTO', 'VACINA'];
+    // Tipos que mostram SKU
+    var TIPOS_SKU = ['MEDICAMENTO', 'MATERIAL_ODONTOLOGICO'];
+    // Data de Validade NÃO é mais condicional — fica sempre visível no
+    // formulário (é opcional, então não faz mal aparecer pra qualquer
+    // categoria; várias categorias além de Medicamento/Vacina podem ter
+    // prazo de validade, ex: Insumo, Outro).
 
     var selectCategoria = document.getElementById('id_categoria');
-    if (!selectCategoria) { return; }
+    if (!selectCategoria) return;
 
-    function aplicarCamposVisiveis() {
-        var opcao = selectCategoria.options[selectCategoria.selectedIndex];
-        var tipo = opcao ? opcao.getAttribute('data-tipo') : null;
-        var permitidos = (tipo && CAMPOS_POR_TIPO[tipo]) ? CAMPOS_POR_TIPO[tipo] : CAMPOS_CONDICIONAIS;
+    function aplicarCampos() {
+        var op = selectCategoria.options[selectCategoria.selectedIndex];
+        var tipo = op ? op.getAttribute('data-tipo') : '';
 
-        CAMPOS_CONDICIONAIS.forEach(function (nome) {
-            var wrapper = document.getElementById('campo-' + nome);
-            if (wrapper) {
-                wrapper.style.display = permitidos.indexOf(nome) !== -1 ? '' : 'none';
-            }
-        });
+        // Lote
+        var campoLote = document.getElementById('campo-lote');
+        if (campoLote) campoLote.style.display = TIPOS_RASTREABILIDADE.includes(tipo) ? '' : 'none';
+
+        // SKU
+        var campoSku = document.getElementById('campo-sku');
+        if (campoSku) campoSku.style.display = TIPOS_SKU.includes(tipo) ? '' : 'none';
     }
 
-    selectCategoria.addEventListener('change', aplicarCamposVisiveis);
-    aplicarCamposVisiveis();
+    selectCategoria.addEventListener('change', aplicarCampos);
+    aplicarCampos();
+
+    // Animação do details/summary
+    document.querySelectorAll('details').forEach(function(el) {
+        el.addEventListener('toggle', function() {
+            var icon = el.querySelector('.toggle-icon');
+            if (icon) {
+                icon.style.transform = el.open ? 'rotate(90deg)' : '';
+            }
+        });
+    });
 })();
 </script>
 {% endblock %}

@@ -5,21 +5,14 @@ from . import views
 app_name = 'estoque'
 
 urlpatterns = [
+    # Dashboard
     path('', views.DashboardView.as_view(), name='dashboard'),
 
-    # Categorias
-    path('categorias/', views.CategoriaListView.as_view(), name='categoria_list'),
-    path('categorias/nova/', views.CategoriaCreateView.as_view(), name='categoria_create'),
-    path('categorias/<int:pk>/', views.CategoriaDetailView.as_view(), name='categoria_detail'),
-    path('categorias/<int:pk>/editar/', views.CategoriaUpdateView.as_view(), name='categoria_update'),
-    path('categorias/<int:pk>/excluir/', views.CategoriaDeleteView.as_view(), name='categoria_delete'),
-
-    # Fornecedores
-    path('fornecedores/', views.FornecedorListView.as_view(), name='fornecedor_list'),
-    path('fornecedores/novo/', views.FornecedorCreateView.as_view(), name='fornecedor_create'),
-    path('fornecedores/<int:pk>/', views.FornecedorDetailView.as_view(), name='fornecedor_detail'),
-    path('fornecedores/<int:pk>/editar/', views.FornecedorUpdateView.as_view(), name='fornecedor_update'),
-    path('fornecedores/<int:pk>/excluir/', views.FornecedorDeleteView.as_view(), name='fornecedor_delete'),
+    # Unidades (admin only)
+    path('unidades/', views.UnidadeListView.as_view(), name='unidade_list'),
+    path('unidades/nova/', views.UnidadeCreateView.as_view(), name='unidade_create'),
+    path('unidades/<int:pk>/', views.UnidadeDetailView.as_view(), name='unidade_detail'),
+    path('unidades/<int:pk>/editar/', views.UnidadeUpdateView.as_view(), name='unidade_update'),
 
     # Produtos
     path('produtos/', views.ProdutoListView.as_view(), name='produto_list'),
@@ -27,13 +20,33 @@ urlpatterns = [
     path('produtos/<int:pk>/', views.ProdutoDetailView.as_view(), name='produto_detail'),
     path('produtos/<int:pk>/editar/', views.ProdutoUpdateView.as_view(), name='produto_update'),
     path('produtos/<int:pk>/excluir/', views.ProdutoDeleteView.as_view(), name='produto_delete'),
-
-    # Ação rápida de movimentação (usada nos botões +/- da listagem de produtos)
     path('produtos/<int:pk>/movimentacao-rapida/', views.MovimentacaoRapidaView.as_view(), name='movimentacao_rapida'),
 
     # Movimentações
     path('movimentacoes/', views.MovimentacaoListView.as_view(), name='movimentacao_list'),
     path('movimentacoes/nova/', views.MovimentacaoCreateView.as_view(), name='movimentacao_create'),
+    path('movimentacoes/<int:pk>/', views.MovimentacaoDetailView.as_view(), name='movimentacao_detail'),
+    path('movimentacoes/<int:pk>/excluir/', views.MovimentacaoDeleteView.as_view(), name='movimentacao_delete'),
+
+    # Usuários (admin only)
+    path('usuarios/', views.UsuarioListView.as_view(), name='usuario_list'),
+    path('usuarios/novo/', views.UsuarioCreateView.as_view(), name='usuario_create'),
+    path('usuarios/<int:pk>/editar/', views.UsuarioUpdateView.as_view(), name='usuario_update'),
+    path('usuarios/<int:pk>/excluir/', views.UsuarioDeleteView.as_view(), name='usuario_delete'),
+
+    # Banco de Horas (admin/RH only)
+    path('banco-de-horas/', views.FuncionarioListView.as_view(), name='funcionario_list'),
+    path('banco-de-horas/novo/', views.FuncionarioCreateView.as_view(), name='funcionario_create'),
+    path('banco-de-horas/lancamento/novo/', views.LancamentoFolgaCreateView.as_view(), name='lancamento_create'),
+    path('banco-de-horas/lancamento/<int:pk>/excluir/', views.LancamentoFolgaDeleteView.as_view(), name='lancamento_delete'),
+    path('banco-de-horas/eventos/', views.EventoFolgaListView.as_view(), name='evento_folga_list'),
+    path('banco-de-horas/eventos/novo/', views.EventoFolgaCreateView.as_view(), name='evento_folga_create'),
+    path('banco-de-horas/eventos/<int:pk>/', views.EventoFolgaDetailView.as_view(), name='evento_folga_detail'),
+    path('banco-de-horas/eventos/<int:pk>/editar/', views.EventoFolgaUpdateView.as_view(), name='evento_folga_update'),
+    path('banco-de-horas/eventos/<int:pk>/excluir/', views.EventoFolgaDeleteView.as_view(), name='evento_folga_delete'),
+    path('banco-de-horas/<int:pk>/', views.FuncionarioDetailView.as_view(), name='funcionario_detail'),
+    path('banco-de-horas/<int:pk>/editar/', views.FuncionarioUpdateView.as_view(), name='funcionario_update'),
+    path('banco-de-horas/<int:pk>/excluir/', views.FuncionarioDeleteView.as_view(), name='funcionario_delete'),
 
     # Relatórios
     path('relatorios/', views.RelatorioListView.as_view(), name='relatorio_list'),

@@ -1,0 +1,45 @@
+{% extends 'estoque/base.html' %}
+{% block title %}Excluir Funcionário — Gestão de Estoque{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title"><i class="bi bi-exclamation-triangle-fill text-danger"></i> Excluir Funcionário</h1>
+            <p class="page-subtitle">Esta ação não pode ser desfeita.</p>
+        </div>
+    </div>
+
+    <div class="form-card" style="max-width: 640px;">
+        <p>
+            Tem certeza que deseja excluir <strong>{{ object.nome }}</strong>
+            {% if object.cargo %}({{ object.cargo }}){% endif %}?
+        </p>
+
+        {% if total_lancamentos %}
+        <div class="alert-inline alert-inline-danger">
+            <i class="bi bi-exclamation-octagon-fill"></i>
+            Este funcionário tem <strong>{{ total_lancamentos }} lançamento{{ total_lancamentos|pluralize }}</strong>
+            de folga registrado{{ total_lancamentos|pluralize }} (saldo atual:
+            <strong>{{ object.saldo_dias }} dia{{ object.saldo_dias|pluralize }}</strong>).
+            Excluir o funcionário apaga <strong>todo esse histórico</strong> junto — inclusive
+            créditos vindos de eventos de folga. Se o funcionário só está de saída da unidade,
+            considere desativá-lo em vez de excluir (edite o cadastro e desmarque "Ativo") para
+            manter o histórico.
+        </div>
+        {% else %}
+        <div class="alert-inline">
+            <i class="bi bi-info-circle"></i> Este funcionário não tem nenhum lançamento de folga registrado.
+        </div>
+        {% endif %}
+
+        <form method="post" class="form-actions">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">
+                <i class="bi bi-trash-fill"></i> Sim, Excluir Definitivamente
+            </button>
+            <a href="{{ object.get_absolute_url }}" class="btn btn-outline-secondary">Cancelar</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

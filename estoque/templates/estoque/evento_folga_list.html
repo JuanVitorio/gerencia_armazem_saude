@@ -1,0 +1,81 @@
+{% extends 'estoque/base.html' %}
+{% block title %}Eventos de Folga — Gestão de Estoque{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title"><i class="bi bi-calendar-event text-primary"></i> Eventos de Folga</h1>
+            <p class="page-subtitle">Dias trabalhados fora da escala normal que geraram folga em lote (ex: Dia de Vacinação).</p>
+        </div>
+        <div class="page-actions">
+            <a href="{% url 'estoque:funcionario_list' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Banco de Dias de Folga
+            </a>
+            <a href="{% url 'estoque:evento_folga_create' %}" class="btn btn-success btn-sm" id="btn-novo-evento">
+                <i class="bi bi-calendar-plus"></i> Registrar Evento
+            </a>
+        </div>
+    </div>
+
+    <div class="table-card">
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Evento</th>
+                        <th>Data</th>
+                        <th class="text-end">Dias/participante</th>
+                        <th class="text-end">Participantes</th>
+                        <th>Registrado por</th>
+                        <th class="text-end">Opções</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for evento in eventos %}
+                    <tr>
+                        <td>
+                            <a href="{{ evento.get_absolute_url }}" class="item-link-dark">{{ evento.nome }}</a>
+                            {% if evento.descricao %}
+                                <div class="text-muted small">{{ evento.descricao|truncatechars:80 }}</div>
+                            {% endif %}
+                        </td>
+                        <td>{{ evento.data|date:'d/m/Y' }}</td>
+                        <td class="text-end">{{ evento.dias }} dia{{ evento.dias|pluralize }}</td>
+                        <td class="text-end">
+                            <span class="cat-tag"><i class="bi bi-people"></i> {{ evento.qtd_participantes }}</span>
+                        </td>
+                        <td class="small"><i class="bi bi-person me-1"></i>{{ evento.usuario|default:'—' }}</td>
+                        <td class="text-end">
+                            <div class="btn-group-compact">
+                                <a href="{{ evento.get_absolute_url }}" class="btn-icon" title="Ver participantes">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a href="{% url 'estoque:evento_folga_update' evento.pk %}" class="btn-icon" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{% url 'estoque:evento_folga_delete' evento.pk %}" class="btn-icon btn-icon-danger" title="Excluir">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state-inline">
+                                <i class="bi bi-calendar-event text-muted"></i>
+                                <p>Nenhum evento registrado ainda.</p>
+                                <a href="{% url 'estoque:evento_folga_create' %}" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-plus-lg"></i> Registrar Primeiro Evento
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

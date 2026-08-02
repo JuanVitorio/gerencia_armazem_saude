@@ -1,0 +1,92 @@
+{% extends 'estoque/base.html' %}
+{% load humanize %}
+{% block title %}Movimentação #{{ movimentacao.pk }} — Gestão de Estoque{% endblock %}
+
+{% block content %}
+<div class="page-container">
+
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">
+                {% if movimentacao.tipo == 'ENTRADA' %}
+                    <span class="mov-badge mov-entrada"><i class="bi bi-plus-lg"></i> Entrada</span>
+                {% else %}
+                    <span class="mov-badge mov-saida"><i class="bi bi-dash-lg"></i> Saída</span>
+                {% endif %}
+                de {{ movimentacao.quantidade }} × {{ movimentacao.produto.nome }}
+            </h1>
+            <p class="page-subtitle">Registrada {{ movimentacao.data|naturaltime }} — {{ movimentacao.data|date:'d/m/Y H:i' }}</p>
+        </div>
+        <div class="page-actions">
+            <a href="{{ movimentacao.produto.get_absolute_url }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-box-seam"></i> Ver Produto
+            </a>
+            <a href="{% url 'estoque:movimentacao_delete' movimentacao.pk %}" class="btn btn-outline-danger btn-sm">
+                <i class="bi bi-trash"></i> Excluir e Estornar
+            </a>
+            <a href="{% url 'estoque:movimentacao_list' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Voltar
+            </a>
+        </div>
+    </div>
+
+    <div class="table-card">
+        <div class="table-card-header">
+            <h2 class="table-card-title"><i class="bi bi-info-circle text-primary me-1"></i> Detalhes do Registro</h2>
+        </div>
+
+        <div class="ficha-grid">
+            <div class="ficha-item">
+                <span class="ficha-label">Produto</span>
+                <span class="ficha-value">
+                    <a href="{{ movimentacao.produto.get_absolute_url }}">{{ movimentacao.produto.nome }}</a>
+                </span>
+            </div>
+            <div class="ficha-item">
+                <span class="ficha-label">Unidade de Origem</span>
+                <span class="ficha-value">
+                    {% if movimentacao.produto.unidade %}
+                        <i class="bi bi-building"></i> {{ movimentacao.produto.unidade.nome }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </span>
+            </div>
+            <div class="ficha-item">
+                <span class="ficha-label">Categoria</span>
+                <span class="ficha-value">{{ movimentacao.produto.categoria|default:'—' }}</span>
+            </div>
+            <div class="ficha-item">
+                <span class="ficha-label">Quantidade</span>
+                <span class="ficha-value">{{ movimentacao.quantidade }} {{ movimentacao.produto.get_unidade_medida_display }}</span>
+            </div>
+            <div class="ficha-item">
+                <span class="ficha-label">Usuário Responsável</span>
+                <span class="ficha-value">
+                    <i class="bi bi-person"></i> {{ movimentacao.usuario|default:'Usuário removido' }}
+                </span>
+            </div>
+            <div class="ficha-item">
+                <span class="ficha-label">Data e Hora</span>
+                <span class="ficha-value">{{ movimentacao.data|date:'d/m/Y H:i' }}</span>
+            </div>
+            <div class="ficha-item ficha-item-full">
+                <span class="ficha-label">Motivo / Observação</span>
+                <span class="ficha-value">{{ movimentacao.motivo|default:'—' }}</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="alert-inline mt-3">
+        <i class="bi bi-info-circle"></i>
+        Excluir este registro estorna automaticamente o efeito dele no estoque de
+        <strong>{{ movimentacao.produto.nome }}</strong>
+        {% if movimentacao.tipo == 'ENTRADA' %}
+            (a quantidade será subtraída de volta, desfazendo esta entrada).
+        {% else %}
+            (a quantidade será devolvida ao estoque, desfazendo esta saída).
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

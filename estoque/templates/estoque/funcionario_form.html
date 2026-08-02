@@ -1,0 +1,84 @@
+{% extends 'estoque/base.html' %}
+{% block title %}{% if object %}Editar{% else %}Novo{% endif %} Funcionário — Gestão de Estoque{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">
+                <i class="bi bi-person-badge text-primary"></i>
+                {% if object %}Editar Funcionário{% else %}Novo Funcionário{% endif %}
+            </h1>
+            <p class="page-subtitle">Cadastro para controle do banco de horas.</p>
+        </div>
+        <a href="{% url 'estoque:funcionario_list' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Voltar
+        </a>
+    </div>
+
+    <div class="form-card" style="max-width: 640px;">
+        <form method="post" novalidate>
+            {% csrf_token %}
+
+            {% for error in form.non_field_errors %}
+            <div class="alert-inline alert-inline-danger">
+                <i class="bi bi-exclamation-octagon-fill"></i> {{ error }}
+            </div>
+            {% endfor %}
+
+            <div class="form-row">
+                <div class="form-col-full">
+                    <label for="{{ form.nome.id_for_label }}" class="form-label-compact">
+                        Nome <span class="req">*</span>
+                    </label>
+                    {{ form.nome }}
+                    {% for e in form.nome.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-col-lg">
+                    <label for="{{ form.cargo.id_for_label }}" class="form-label-compact">
+                        Cargo / Função <span class="form-hint">(opcional)</span>
+                    </label>
+                    {{ form.cargo }}
+                    {% for e in form.cargo.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="form-col-sm">
+                    <label for="{{ form.matricula.id_for_label }}" class="form-label-compact">
+                        Matrícula <span class="form-hint">(opcional)</span>
+                    </label>
+                    {{ form.matricula }}
+                    {% for e in form.matricula.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-col-full">
+                    <label for="{{ form.unidade.id_for_label }}" class="form-label-compact">
+                        Unidade <span class="form-hint">(opcional)</span>
+                    </label>
+                    {{ form.unidade }}
+                    {% for e in form.unidade.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-col-full">
+                    <label class="form-check-label d-flex align-items-center gap-2">
+                        {{ form.ativo }}
+                        <span>Funcionário Ativo</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-circle-fill"></i> Salvar Funcionário
+                </button>
+                <a href="{% url 'estoque:funcionario_list' %}" class="btn btn-outline-secondary">Cancelar</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

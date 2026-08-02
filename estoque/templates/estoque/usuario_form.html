@@ -1,0 +1,108 @@
+{% extends 'estoque/base.html' %}
+{% block title %}{% if object %}Editar{% else %}Novo{% endif %} Usuário — Gestão de Estoque{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">
+                <i class="bi bi-person-gear text-primary"></i>
+                {% if object %}Editar Usuário: {{ object.username }}{% else %}Novo Usuário{% endif %}
+            </h1>
+            <p class="page-subtitle">Configure as credenciais e defina a qual unidade o funcionário pertence.</p>
+        </div>
+        <a href="{% url 'estoque:usuario_list' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Voltar
+        </a>
+    </div>
+
+    <div class="form-card" style="max-width: 680px;">
+        <form method="post" novalidate>
+            {% csrf_token %}
+
+            {% for error in form_usuario.non_field_errors %}
+            <div class="alert-inline alert-inline-danger">
+                <i class="bi bi-exclamation-octagon-fill"></i> {{ error }}
+            </div>
+            {% endfor %}
+            {% for error in form_perfil.non_field_errors %}
+            <div class="alert-inline alert-inline-danger">
+                <i class="bi bi-exclamation-octagon-fill"></i> {{ error }}
+            </div>
+            {% endfor %}
+
+            <div class="form-row">
+                <div class="form-col-sm">
+                    <label for="{{ form_usuario.username.id_for_label }}" class="form-label-compact">
+                        Usuário (Login) <span class="req">*</span>
+                    </label>
+                    {{ form_usuario.username }}
+                    {% for e in form_usuario.username.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="form-col-sm">
+                    <label for="{{ form_usuario.email.id_for_label }}" class="form-label-compact">E-mail</label>
+                    {{ form_usuario.email }}
+                    {% for e in form_usuario.email.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-col-sm">
+                    <label for="{{ form_usuario.first_name.id_for_label }}" class="form-label-compact">Nome</label>
+                    {{ form_usuario.first_name }}
+                    {% for e in form_usuario.first_name.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="form-col-sm">
+                    <label for="{{ form_usuario.last_name.id_for_label }}" class="form-label-compact">Sobrenome</label>
+                    {{ form_usuario.last_name }}
+                    {% for e in form_usuario.last_name.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-col-sm">
+                    <label for="{{ form_usuario.password1.id_for_label }}" class="form-label-compact">
+                        Senha {% if not object %}<span class="req">*</span>{% endif %}
+                    </label>
+                    {{ form_usuario.password1 }}
+                    {% if form_usuario.password1.help_text %}<div class="form-hint">{{ form_usuario.password1.help_text }}</div>{% endif %}
+                    {% for e in form_usuario.password1.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="form-col-sm">
+                    <label for="{{ form_usuario.password2.id_for_label }}" class="form-label-compact">Confirmar Senha</label>
+                    {{ form_usuario.password2 }}
+                    {% for e in form_usuario.password2.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+            </div>
+
+            <hr class="my-3">
+
+            <div class="form-row">
+                <div class="form-col-full">
+                    <label for="{{ form_perfil.unidade.id_for_label }}" class="form-label-compact">
+                        Unidade Vinculada <span class="form-hint">(defina qual estoque este usuário poderá acessar)</span>
+                    </label>
+                    {{ form_perfil.unidade }}
+                    {% for e in form_perfil.unidade.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-col-full">
+                    <label class="form-check-label d-flex align-items-center gap-2">
+                        {{ form_usuario.is_active }}
+                        <span>Usuário Ativo (pode fazer login)</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-circle-fill"></i> Salvar Usuário
+                </button>
+                <a href="{% url 'estoque:usuario_list' %}" class="btn btn-outline-secondary">Cancelar</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
