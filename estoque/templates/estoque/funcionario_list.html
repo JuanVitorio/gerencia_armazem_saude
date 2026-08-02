@@ -101,6 +101,9 @@
                                 <a href="{% url 'estoque:funcionario_update' funcionario.pk %}" class="btn-icon" title="Editar">
                                     <i class="bi bi-pencil"></i>
                                 </a>
+                                <a href="{% url 'estoque:funcionario_delete' funcionario.pk %}" class="btn-icon btn-icon-danger" title="Excluir">
+                                    <i class="bi bi-trash"></i>
+                                </a>
                             </div>
                         </td>
                     </tr>

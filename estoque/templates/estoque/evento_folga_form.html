@@ -1,19 +1,30 @@
 {% extends 'estoque/base.html' %}
-{% block title %}Registrar Evento — Banco de Dias de Folga{% endblock %}
+{% block title %}{% if evento %}Editar Evento{% else %}Registrar Evento{% endif %} — Banco de Dias de Folga{% endblock %}
 
 {% block content %}
 <div class="page-container">
     <div class="page-header">
         <div>
             <h1 class="page-title">
-                <i class="bi bi-calendar-plus text-primary"></i> Registrar Evento de Folga
+                {% if evento %}
+                    <i class="bi bi-pencil-square text-primary"></i> Editar Evento de Folga
+                {% else %}
+                    <i class="bi bi-calendar-plus text-primary"></i> Registrar Evento de Folga
+                {% endif %}
             </h1>
             <p class="page-subtitle">
-                Ex: "Dia de Vacinação" — registre o evento e marque quem participou.
-                Cada funcionário selecionado recebe os dias de folga automaticamente.
+                {% if evento %}
+                    Ajuste os dados do evento e marque/desmarque participantes — quem for
+                    desmarcado tem o crédito de folga referente a este evento removido, e
+                    quem for marcado agora recebe o crédito na hora. Nada aqui exige recriar o evento.
+                {% else %}
+                    Ex: "Dia de Vacinação" — registre o evento e marque quem participou.
+                    Cada funcionário selecionado recebe os dias de folga automaticamente.
+                {% endif %}
             </p>
         </div>
-        <a href="{% url 'estoque:evento_folga_list' %}" class="btn btn-outline-secondary btn-sm">
+        <a href="{% if evento %}{{ evento.get_absolute_url }}{% else %}{% url 'estoque:evento_folga_list' %}{% endif %}"
+           class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-arrow-left"></i> Voltar
         </a>
     </div>
@@ -114,6 +125,9 @@
                                 <label for="func-{{ funcionario.pk }}" class="item-link-dark" style="cursor: pointer;">
                                     {{ funcionario.nome }}
                                 </label>
+                                {% if not funcionario.ativo %}
+                                    <span class="status-tag status-muted">Inativo</span>
+                                {% endif %}
                             </td>
                             <td>{{ funcionario.cargo|default:'—' }}</td>
                             <td>{{ funcionario.unidade|default:'—' }}</td>
@@ -138,9 +152,14 @@
 
         <div class="form-actions" style="max-width: 760px;">
             <button type="submit" class="btn btn-success">
-                <i class="bi bi-check-circle-fill"></i> Registrar Evento e Conceder Folga
+                {% if evento %}
+                    <i class="bi bi-check-circle-fill"></i> Salvar Alterações
+                {% else %}
+                    <i class="bi bi-check-circle-fill"></i> Registrar Evento e Conceder Folga
+                {% endif %}
             </button>
-            <a href="{% url 'estoque:evento_folga_list' %}" class="btn btn-outline-secondary">Cancelar</a>
+            <a href="{% if evento %}{{ evento.get_absolute_url }}{% else %}{% url 'estoque:evento_folga_list' %}{% endif %}"
+               class="btn btn-outline-secondary">Cancelar</a>
         </div>
     </form>
 </div>

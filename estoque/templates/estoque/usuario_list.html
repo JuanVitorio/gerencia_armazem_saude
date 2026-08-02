@@ -61,6 +61,12 @@
                                 <a href="{% url 'estoque:usuario_update' u.pk %}" class="btn-icon" title="Editar">
                                     <i class="bi bi-pencil"></i>
                                 </a>
+                                {% if u.pk != request.user.pk and not u.is_superuser %}
+                                <a href="{% url 'estoque:usuario_delete' u.pk %}" class="btn-icon btn-icon-danger" title="Excluir"
+                                   id="btn-excluir-usuario-{{ u.pk }}">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>

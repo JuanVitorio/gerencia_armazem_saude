@@ -28,6 +28,10 @@
                class="btn btn-outline-secondary btn-sm">
                 <i class="bi bi-pencil-square"></i> Editar
             </a>
+            <a href="{% url 'estoque:funcionario_delete' funcionario.pk %}"
+               class="btn btn-outline-danger btn-sm">
+                <i class="bi bi-trash"></i> Excluir
+            </a>
             <a href="{% url 'estoque:funcionario_list' %}" class="btn btn-outline-secondary btn-sm">
                 <i class="bi bi-arrow-left"></i> Voltar
             </a>

@@ -51,6 +51,9 @@
                                 <a href="{{ evento.get_absolute_url }}" class="btn-icon" title="Ver participantes">
                                     <i class="bi bi-eye"></i>
                                 </a>
+                                <a href="{% url 'estoque:evento_folga_update' evento.pk %}" class="btn-icon" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
                             </div>
                         </td>
                     </tr>
