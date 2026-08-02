@@ -808,6 +808,41 @@ class EventoFolgaDetailView(LoginRequiredMixin, AdminRequiredMixin, DetailView):
         return context
 
 
+class EventoFolgaDeleteView(LoginRequiredMixin, AdminRequiredMixin, DeleteView):
+    """
+    Exclui um evento de folga e, junto, TODOS os créditos de folga que ele
+    gerou. LancamentoFolga.evento é on_delete=SET_NULL — ou seja, por
+    padrão o Django só desvincularia os lançamentos, sem apagá-los, e eles
+    continuariam valendo no saldo dos funcionários. Isso não faz sentido
+    se o evento inteiro foi um engano, então apagamos os lançamentos
+    explicitamente antes de apagar o evento (mesma linha de raciocínio do
+    estorno em Movimentações e da exclusão em cascata de Funcionário).
+    """
+    model = EventoFolga
+    template_name = 'estoque/evento_folga_confirm_delete.html'
+    success_url = reverse_lazy('estoque:evento_folga_list')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['participantes'] = self.object.lancamentos.select_related('funcionario').order_by('funcionario__nome')
+        return context
+
+    def form_valid(self, form):
+        evento = self.object
+        nome = evento.nome
+        total_participantes = evento.lancamentos.count()
+
+        with transaction.atomic():
+            evento.lancamentos.all().delete()
+            response = super().form_valid(form)
+
+        messages.success(
+            self.request,
+            f'Evento "{nome}" excluído — {total_participantes} lançamento(s) de folga revertido(s) junto.',
+        )
+        return response
+
+
 class EventoFolgaCreateView(LoginRequiredMixin, AdminRequiredMixin, View):
     """
     Registra o evento (ex: "Dia de Vacinação") e, para cada funcionário

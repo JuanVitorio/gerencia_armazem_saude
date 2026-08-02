@@ -85,8 +85,10 @@
                     {{ form.lote }}
                     {% for e in form.lote.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
                 </div>
-                <div class="form-col-sm" id="campo-data_validade" style="display:none;">
-                    <label for="{{ form.data_validade.id_for_label }}" class="form-label-compact">Data de Validade</label>
+                <div class="form-col-sm" id="campo-data_validade">
+                    <label for="{{ form.data_validade.id_for_label }}" class="form-label-compact">
+                        Data de Validade <span class="form-hint">opcional — vacinas, medicamentos etc.</span>
+                    </label>
                     {{ form.data_validade }}
                     {% for e in form.data_validade.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
                 </div>
@@ -140,12 +142,14 @@
 {% block extra_scripts %}
 <script>
 (function () {
-    // Tipos que mostram rastreabilidade (lote + validade)
+    // Tipos que mostram rastreabilidade (lote)
     var TIPOS_RASTREABILIDADE = ['MEDICAMENTO', 'VACINA'];
     // Tipos que mostram SKU
     var TIPOS_SKU = ['MEDICAMENTO', 'MATERIAL_ODONTOLOGICO'];
-    // Tipos que mostram validade (sem obrigar lote)
-    var TIPOS_VALIDADE = ['MEDICAMENTO', 'VACINA', 'ALIMENTO', 'MATERIAL_LIMPEZA'];
+    // Data de Validade NÃO é mais condicional — fica sempre visível no
+    // formulário (é opcional, então não faz mal aparecer pra qualquer
+    // categoria; várias categorias além de Medicamento/Vacina podem ter
+    // prazo de validade, ex: Insumo, Outro).
 
     var selectCategoria = document.getElementById('id_categoria');
     if (!selectCategoria) return;
@@ -157,10 +161,6 @@
         // Lote
         var campoLote = document.getElementById('campo-lote');
         if (campoLote) campoLote.style.display = TIPOS_RASTREABILIDADE.includes(tipo) ? '' : 'none';
-
-        // Validade
-        var campoVal = document.getElementById('campo-data_validade');
-        if (campoVal) campoVal.style.display = TIPOS_VALIDADE.includes(tipo) ? '' : 'none';
 
         // SKU
         var campoSku = document.getElementById('campo-sku');

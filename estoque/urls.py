@@ -43,6 +43,7 @@ urlpatterns = [
     path('banco-de-horas/eventos/novo/', views.EventoFolgaCreateView.as_view(), name='evento_folga_create'),
     path('banco-de-horas/eventos/<int:pk>/', views.EventoFolgaDetailView.as_view(), name='evento_folga_detail'),
     path('banco-de-horas/eventos/<int:pk>/editar/', views.EventoFolgaUpdateView.as_view(), name='evento_folga_update'),
+    path('banco-de-horas/eventos/<int:pk>/excluir/', views.EventoFolgaDeleteView.as_view(), name='evento_folga_delete'),
     path('banco-de-horas/<int:pk>/', views.FuncionarioDetailView.as_view(), name='funcionario_detail'),
     path('banco-de-horas/<int:pk>/editar/', views.FuncionarioUpdateView.as_view(), name='funcionario_update'),
     path('banco-de-horas/<int:pk>/excluir/', views.FuncionarioDeleteView.as_view(), name='funcionario_delete'),
