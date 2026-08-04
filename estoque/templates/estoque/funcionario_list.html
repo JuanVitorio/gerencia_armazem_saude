@@ -68,7 +68,7 @@
                         <td>{{ funcionario.cargo|default:'—' }}</td>
                         <td>
                             {% if funcionario.unidade %}
-                                <span class="cat-tag"><i class="bi bi-building"></i> {{ funcionario.unidade.nome }}</span>
+                                <span class="cat-tag"><i class="bi bi-building"></i> {% if funcionario.unidade.codigo %}{{ funcionario.unidade.codigo }} — {% endif %}{{ funcionario.unidade.nome }}</span>
                             {% else %}
                                 <span class="text-muted">—</span>
                             {% endif %}

@@ -52,8 +52,23 @@
         <div class="detail-stat {% if produto.vencido %}detail-stat-danger{% elif produto.venc_proximo %}detail-stat-warning{% endif %}">
             <span class="detail-stat-label">Validade</span>
             <span class="detail-stat-value" style="font-size: 1.1rem;">
-                {% if produto.data_validade %}{{ produto.data_validade|date:'d/m/Y' }}{% else %}—{% endif %}
+                {% if produto.data_validade %}
+                    {{ produto.data_validade|date:'d/m/Y' }}
+                {% else %}
+                    <span class="text-muted">Não informada</span>
+                {% endif %}
             </span>
+            {% if produto.data_validade %}
+                <span class="detail-stat-unit">
+                    {% if produto.vencido %}
+                        vencido há {{ produto.dias_vencido }} dia{{ produto.dias_vencido|pluralize }}
+                    {% elif produto.venc_proximo %}
+                        vence em {{ produto.dias_para_vencer }} dia{{ produto.dias_para_vencer|pluralize }}
+                    {% else %}
+                        dentro do prazo
+                    {% endif %}
+                </span>
+            {% endif %}
         </div>
         <div class="detail-stat">
             <span class="detail-stat-label">Lote</span>

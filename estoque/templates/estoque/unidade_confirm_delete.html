@@ -1,0 +1,50 @@
+{% extends 'estoque/base.html' %}
+{% block title %}Excluir Unidade — Gestão de Estoque{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title"><i class="bi bi-exclamation-triangle-fill text-danger"></i> Excluir Unidade</h1>
+            <p class="page-subtitle">Esta ação não pode ser desfeita.</p>
+        </div>
+    </div>
+
+    <div class="form-card" style="max-width: 640px;">
+        {% if total_produtos or total_membros or total_funcionarios %}
+        <div class="alert-inline alert-inline-danger">
+            <i class="bi bi-exclamation-octagon-fill"></i>
+            <strong>Não é possível excluir "{{ object.nome }}" ainda.</strong> Esta unidade tem:
+            <ul class="mb-0 mt-2">
+                {% if total_produtos %}<li>{{ total_produtos }} produto{{ total_produtos|pluralize }} em estoque</li>{% endif %}
+                {% if total_membros %}<li>{{ total_membros }} usuário{{ total_membros|pluralize }} vinculado{{ total_membros|pluralize }}</li>{% endif %}
+                {% if total_funcionarios %}<li>{{ total_funcionarios }} funcionário{{ total_funcionarios|pluralize }} vinculado{{ total_funcionarios|pluralize }}</li>{% endif %}
+            </ul>
+            <p class="mt-2 mb-0">
+                Exclua ou mova os produtos, e desvincule os usuários/funcionários (edite o
+                cadastro de cada um e troque a unidade) antes de excluir esta unidade — senão o
+                estoque e o histórico de movimentações dela seriam apagados junto.
+            </p>
+        </div>
+        <a href="{{ object.get_absolute_url }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Voltar para a Unidade
+        </a>
+        {% else %}
+        <p>
+            Tem certeza que deseja excluir <strong>{{ object.nome }}</strong>
+            {% if object.codigo %}(<code>{{ object.codigo }}</code>){% endif %}?
+        </p>
+        <div class="alert-inline">
+            <i class="bi bi-info-circle"></i> Esta unidade não tem produtos, usuários nem funcionários vinculados — pode ser excluída com segurança.
+        </div>
+        <form method="post" class="form-actions">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">
+                <i class="bi bi-trash-fill"></i> Sim, Excluir Definitivamente
+            </button>
+            <a href="{{ object.get_absolute_url }}" class="btn btn-outline-secondary">Cancelar</a>
+        </form>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -50,6 +50,7 @@
                     <tr>
                         <th>Produto</th>
                         <th>Categoria</th>
+                        {% if not unidade_atual %}<th>Unidade</th>{% endif %}
                         <th>Qtd.</th>
                         <th>Validade</th>
                         <th class="col-acao-rapida">Ação Rápida</th>
@@ -75,6 +76,17 @@
                             <span class="text-muted">—</span>
                             {% endif %}
                         </td>
+                        {% if not unidade_atual %}
+                        <td>
+                            {% if produto.unidade %}
+                            <span class="cat-tag"><i class="bi bi-building"></i>
+                                {% if produto.unidade.codigo %}{{ produto.unidade.codigo }} — {% endif %}{{ produto.unidade.nome }}
+                            </span>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        {% endif %}
                         <td>
                             <span class="qty-text {% if produto.estoque_baixo %}qty-text-danger{% endif %}">
                                 {{ produto.quantidade }}
@@ -142,7 +154,7 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="6">
+                        <td colspan="{% if not unidade_atual %}7{% else %}6{% endif %}">
                             <div class="empty-state-inline">
                                 <i class="bi bi-inbox"></i>
                                 <p>Nenhum produto encontrado.</p>

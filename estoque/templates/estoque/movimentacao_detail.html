@@ -46,7 +46,7 @@
                 <span class="ficha-label">Unidade de Origem</span>
                 <span class="ficha-value">
                     {% if movimentacao.produto.unidade %}
-                        <i class="bi bi-building"></i> {{ movimentacao.produto.unidade.nome }}
+                        <i class="bi bi-building"></i> {% if movimentacao.produto.unidade.codigo %}{{ movimentacao.produto.unidade.codigo }} — {% endif %}{{ movimentacao.produto.unidade.nome }}
                     {% else %}
                         —
                     {% endif %}

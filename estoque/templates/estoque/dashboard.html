@@ -100,7 +100,7 @@
                         <td>
                             <a href="{{ p.get_absolute_url }}" class="item-link">{{ p.nome }}</a>
                             {% if p.unidade %}
-                                <span class="cat-tag"><i class="bi bi-building"></i> {{ p.unidade.nome }}</span>
+                                <span class="cat-tag"><i class="bi bi-building"></i> {% if p.unidade.codigo %}{{ p.unidade.codigo }} — {% endif %}{{ p.unidade.nome }}</span>
                             {% endif %}
                             {% if p.vencido %}
                                 <span class="status-tag status-danger">Vencido</span>

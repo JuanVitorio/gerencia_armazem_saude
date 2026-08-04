@@ -83,7 +83,7 @@
                 {% if user.perfil.unidade %}
                 <span class="unidade-badge d-none d-md-inline-flex" title="{{ user.perfil.unidade.get_tipo_display }}">
                     <i class="bi bi-geo-alt"></i>
-                    <span class="unidade-nome">{{ user.perfil.unidade.nome }}</span>
+                    <span class="unidade-nome">{% if user.perfil.unidade.codigo %}{{ user.perfil.unidade.codigo }} — {% endif %}{{ user.perfil.unidade.nome }}</span>
                 </span>
                 {% elif user.perfil.is_admin %}
                 <span class="unidade-badge admin-badge d-none d-md-inline-flex">

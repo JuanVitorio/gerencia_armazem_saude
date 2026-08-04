@@ -74,7 +74,7 @@
                         </td>
                         <td>
                             {% if mov.produto.unidade %}
-                                <span class="cat-tag"><i class="bi bi-building"></i> {{ mov.produto.unidade.nome }}</span>
+                                <span class="cat-tag"><i class="bi bi-building"></i> {% if mov.produto.unidade.codigo %}{{ mov.produto.unidade.codigo }} — {% endif %}{{ mov.produto.unidade.nome }}</span>
                             {% else %}
                                 <span class="text-muted">—</span>
                             {% endif %}

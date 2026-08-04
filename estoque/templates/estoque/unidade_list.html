@@ -18,6 +18,7 @@
             <table class="data-table" id="tabela-unidades">
                 <thead>
                     <tr>
+                        <th>Código</th>
                         <th>Nome</th>
                         <th>Tipo</th>
                         <th>Produtos</th>
@@ -28,6 +29,13 @@
                 <tbody>
                 {% for unidade in unidades %}
                     <tr>
+                        <td>
+                            {% if unidade.codigo %}
+                                <code>{{ unidade.codigo }}</code>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
                         <td>
                             <a href="{{ unidade.get_absolute_url }}" class="item-link-dark">
                                 {{ unidade.nome }}
@@ -50,12 +58,15 @@
                                 <a href="{% url 'estoque:unidade_update' unidade.pk %}" class="btn-icon" title="Editar">
                                     <i class="bi bi-pencil"></i>
                                 </a>
+                                <a href="{% url 'estoque:unidade_delete' unidade.pk %}" class="btn-icon btn-icon-danger" title="Excluir">
+                                    <i class="bi bi-trash"></i>
+                                </a>
                             </div>
                         </td>
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="5">
+                        <td colspan="6">
                             <div class="empty-state-inline">
                                 <i class="bi bi-building text-muted"></i>
                                 <p>Nenhuma unidade cadastrada.</p>

@@ -6,7 +6,10 @@
     <div class="page-header">
         <div>
             <div class="d-flex align-items-center gap-2 flex-wrap">
-                <h1 class="page-title mb-0">{{ unidade.nome }}</h1>
+                <h1 class="page-title mb-0">
+                    {% if unidade.codigo %}<code class="me-1">{{ unidade.codigo }}</code>{% endif %}
+                    {{ unidade.nome }}
+                </h1>
                 <span class="cat-tag">{{ unidade.get_tipo_display }}</span>
                 {% if unidade.ativa %}
                     <span class="status-tag status-success">Ativa</span>
@@ -21,6 +24,9 @@
         <div class="page-actions">
             <a href="{% url 'estoque:unidade_update' unidade.pk %}" class="btn btn-outline-secondary btn-sm">
                 <i class="bi bi-pencil"></i> Editar Unidade
+            </a>
+            <a href="{% url 'estoque:unidade_delete' unidade.pk %}" class="btn btn-outline-danger btn-sm">
+                <i class="bi bi-trash"></i> Excluir Unidade
             </a>
             <a href="{% url 'estoque:unidade_list' %}" class="btn btn-outline-secondary btn-sm">
                 <i class="bi bi-arrow-left"></i> Voltar

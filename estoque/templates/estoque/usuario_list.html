@@ -35,7 +35,7 @@
                         <td>{{ u.get_full_name|default:'—' }}</td>
                         <td>
                             {% if u.perfil.unidade %}
-                                <span class="cat-tag"><i class="bi bi-building"></i> {{ u.perfil.unidade.nome }}</span>
+                                <span class="cat-tag"><i class="bi bi-building"></i> {% if u.perfil.unidade.codigo %}{{ u.perfil.unidade.codigo }} — {% endif %}{{ u.perfil.unidade.nome }}</span>
                             {% elif u.is_superuser or u.perfil.is_admin %}
                                 <span class="text-muted">Todas (Admin)</span>
                             {% else %}

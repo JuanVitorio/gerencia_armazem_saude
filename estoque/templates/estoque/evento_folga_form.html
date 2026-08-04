@@ -115,7 +115,7 @@
                     <tbody>
                     {% for funcionario in funcionarios %}
                         <tr class="linha-funcionario"
-                            data-busca="{{ funcionario.nome|lower }} {{ funcionario.cargo|lower }} {{ funcionario.unidade.nome|default:''|lower }}">
+                            data-busca="{{ funcionario.nome|lower }} {{ funcionario.cargo|lower }} {{ funcionario.unidade.nome|default:''|lower }} {{ funcionario.unidade.codigo|default:''|lower }}">
                             <td>
                                 <input type="checkbox" class="form-check-input chk-funcionario" name="funcionarios"
                                        value="{{ funcionario.pk }}" id="func-{{ funcionario.pk }}"
