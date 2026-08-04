@@ -222,7 +222,7 @@ class UnidadeDetailView(LoginRequiredMixin, AdminRequiredMixin, DetailView):
 
 class UnidadeCreateView(LoginRequiredMixin, AdminRequiredMixin, CreateView):
     model = Unidade
-    fields = ['nome', 'tipo', 'descricao', 'ativa']
+    fields = ['nome', 'codigo', 'tipo', 'descricao', 'ativa']
     template_name = 'estoque/unidade_form.html'
     success_url = reverse_lazy('estoque:unidade_list')
 
@@ -233,13 +233,64 @@ class UnidadeCreateView(LoginRequiredMixin, AdminRequiredMixin, CreateView):
 
 class UnidadeUpdateView(LoginRequiredMixin, AdminRequiredMixin, UpdateView):
     model = Unidade
-    fields = ['nome', 'tipo', 'descricao', 'ativa']
+    fields = ['nome', 'codigo', 'tipo', 'descricao', 'ativa']
     template_name = 'estoque/unidade_form.html'
     success_url = reverse_lazy('estoque:unidade_list')
 
     def form_valid(self, form):
         messages.success(self.request, 'Unidade atualizada com sucesso.')
         return super().form_valid(form)
+
+
+class UnidadeDeleteView(LoginRequiredMixin, AdminRequiredMixin, DeleteView):
+    """
+    Exclui uma unidade — só se ela estiver "vazia". Isso importa porque
+    Produto.unidade é on_delete=CASCADE (cada unidade tem estoque próprio,
+    então um produto sem unidade não faz sentido no modelo de dados) — ou
+    seja, excluir uma unidade com produtos apagaria os produtos JUNTO, e
+    junto com eles todo o histórico de movimentações (Movimentacao também
+    é CASCADE a partir de Produto). Pra evitar essa perda de dados em
+    cascata por engano, a exclusão é BLOQUEADA se a unidade ainda tiver
+    produtos, usuários vinculados ou funcionários — o admin precisa
+    esvaziar a unidade primeiro (mover/excluir os produtos, desvincular
+    usuários e funcionários) antes de conseguir excluí-la.
+    """
+    model = Unidade
+    template_name = 'estoque/unidade_confirm_delete.html'
+    success_url = reverse_lazy('estoque:unidade_list')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['total_produtos'] = self.object.produtos.count()
+        context['total_membros'] = self.object.membros.count()
+        context['total_funcionarios'] = self.object.funcionarios.count()
+        return context
+
+    def form_valid(self, form):
+        unidade = self.object
+        total_produtos = unidade.produtos.count()
+        total_membros = unidade.membros.count()
+        total_funcionarios = unidade.funcionarios.count()
+
+        if total_produtos or total_membros or total_funcionarios:
+            partes = []
+            if total_produtos:
+                partes.append(f'{total_produtos} produto(s)')
+            if total_membros:
+                partes.append(f'{total_membros} usuário(s)')
+            if total_funcionarios:
+                partes.append(f'{total_funcionarios} funcionário(s)')
+            messages.error(
+                self.request,
+                f'Não é possível excluir "{unidade.nome}": ainda tem {", ".join(partes)} '
+                f'vinculado(s). Mova ou remova esses vínculos antes de excluir a unidade.',
+            )
+            return redirect('estoque:unidade_detail', pk=unidade.pk)
+
+        nome = unidade.nome
+        response = super().form_valid(form)
+        messages.success(self.request, f'Unidade "{nome}" excluída com sucesso.')
+        return response
 
 
 # ---------------------------------------------------------------------------

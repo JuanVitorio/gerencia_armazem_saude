@@ -90,6 +90,10 @@ class Unidade(models.Model):
     ]
 
     nome = models.CharField('Nome', max_length=150)
+    codigo = models.CharField(
+        'Código', max_length=20, unique=True, null=True, blank=True,
+        help_text='Código curto de identificação da unidade (ex: PS-01, SEC-CENTRAL). Opcional.',
+    )
     tipo = models.CharField('Tipo', max_length=20, choices=TIPO_CHOICES, default=POSTO_SAUDE)
     descricao = models.TextField('Descrição', blank=True)
     ativa = models.BooleanField('Ativa', default=True)
@@ -101,6 +105,10 @@ class Unidade(models.Model):
         ordering = ['tipo', 'nome']
 
     def __str__(self):
+        # O código (quando preenchido) aparece automaticamente em todo
+        # lugar que usa str(unidade) — selects de formulário, badges, etc.
+        if self.codigo:
+            return f'[{self.codigo}] {self.get_tipo_display()} — {self.nome}'
         return f'{self.get_tipo_display()} — {self.nome}'
 
     def get_absolute_url(self):
@@ -321,6 +329,13 @@ class Produto(models.Model):
     def venc_proximo(self):
         dias = self.dias_para_vencer
         return dias is not None and 0 <= dias <= settings.DIAS_ALERTA_VENCIMENTO
+
+    @property
+    def dias_vencido(self):
+        """Há quantos dias o produto está vencido (None se não estiver vencido)."""
+        if self.vencido:
+            return abs(self.dias_para_vencer)
+        return None
 
 
 class Movimentacao(models.Model):
