@@ -93,7 +93,7 @@ LOGOUT_REDIRECT_URL = 'login'
 # simplificar o dia a dia dos postos/secretarias), o sistema usa um limite
 # único e global para sinalizar "estoque baixo". Ajuste esse número conforme
 # a realidade da sua secretaria.
-LIMITE_ESTOQUE_BAIXO = 10
+LIMITE_ESTOQUE_BAIXO = 3
 
 # Quantos dias antes do vencimento um produto passa a ser sinalizado como
 # "próximo do vencimento" no dashboard e nos relatórios.
