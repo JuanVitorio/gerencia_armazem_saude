@@ -37,6 +37,11 @@
                href="{% url 'estoque:movimentacao_list' %}">
                 <i class="bi bi-arrow-down-up"></i> Movimentações
             </a>
+            <!-- NOVO: Requisição de Materiais -->
+            <a class="nav-link {% if request.resolver_match.url_name == 'requisicao' %}active{% endif %}"
+               href="{% url 'estoque:requisicao' %}">
+                <i class="bi bi-clipboard2-check"></i> Requisição
+            </a>
             <a class="nav-link {% if 'relatorio' in request.resolver_match.url_name %}active{% endif %}"
                href="{% url 'estoque:relatorio_list' %}">
                 <i class="bi bi-file-earmark-bar-graph"></i> Relatórios
@@ -141,6 +146,11 @@
             <a class="nav-link-mobile {% if 'movimentacao' in request.resolver_match.url_name %}active{% endif %}"
                href="{% url 'estoque:movimentacao_list' %}">
                 <i class="bi bi-arrow-down-up"></i> Movimentações
+            </a>
+            <!-- NOVO: Requisição de Materiais -->
+            <a class="nav-link-mobile {% if request.resolver_match.url_name == 'requisicao' %}active{% endif %}"
+               href="{% url 'estoque:requisicao' %}">
+                <i class="bi bi-clipboard2-check"></i> Requisição
             </a>
             <a class="nav-link-mobile {% if 'relatorio' in request.resolver_match.url_name %}active{% endif %}"
                href="{% url 'estoque:relatorio_list' %}">

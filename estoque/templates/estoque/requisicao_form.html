@@ -1,0 +1,385 @@
+{% extends 'estoque/base.html' %}
+{% load static %}
+{% block title %}Requisição de Materiais — Gestão de Estoque{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Estilo para destacar os campos com erro */
+    .field-error-highlight {
+        border-color: #dc3545 !important;
+        box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25) !important;
+    }
+    .table-error-highlight {
+        border: 2px solid #dc3545 !important;
+        border-radius: 4px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">
+                <i class="bi bi-clipboard2-check text-primary"></i> Requisição de Materiais
+            </h1>
+            <p class="page-subtitle">Monte a lista de itens em falta e gere um documento para assinatura e entrega ao depósito.</p>
+        </div>
+    </div>
+
+    <!-- Div dinamica para mensagens de alerta via JS -->
+    <div id="js-alert-container"></div>
+
+    {% for error in form.non_field_errors %}
+    <div class="alert-inline alert-inline-danger">
+        <i class="bi bi-exclamation-octagon-fill"></i> {{ error }}
+    </div>
+    {% endfor %}
+    {% for e in form.itens_json.errors %}
+    <div class="alert-inline alert-inline-danger">
+        <i class="bi bi-exclamation-octagon-fill"></i> {{ e }}
+    </div>
+    {% endfor %}
+
+    <!-- O formulário inteiro (cabeçalho + itens) é enviado de uma vez; o botão
+         "Adicionar à Lista" é type="button" e não submete a página. -->
+    <form method="post" id="form-requisicao" target="_blank" novalidate>
+        {% csrf_token %}
+        {{ form.itens_json }}
+
+        <!-- Cabeçalho: Unidade / Solicitante / Data -->
+        <div class="form-card mb-3">
+            <div class="form-row">
+                <div class="form-col-lg">
+                    <label for="{{ form.unidade.id_for_label }}" class="form-label-compact">
+                        Unidade Solicitante <span class="req">*</span>
+                    </label>
+                    {{ form.unidade }}
+                    {% for e in form.unidade.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="form-col-lg">
+                    <label for="{{ form.solicitante.id_for_label }}" class="form-label-compact">
+                        Nome do Solicitante <span class="req">*</span>
+                    </label>
+                    {{ form.solicitante }}
+                    {% for e in form.solicitante.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="form-col-sm">
+                    <label for="{{ form.data_solicitacao.id_for_label }}" class="form-label-compact">
+                        Data <span class="req">*</span>
+                    </label>
+                    {{ form.data_solicitacao }}
+                    {% for e in form.data_solicitacao.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Busca rápida de produto + quantidade + adicionar -->
+        <div class="form-card mb-3">
+            <label class="form-label-compact">Adicionar Produto à Lista</label>
+            <div class="form-row" style="align-items: flex-end;">
+                <div class="form-col-lg">
+                    <div class="produto-busca-wrap">
+                        <i class="bi bi-search produto-busca-icon"></i>
+                        <input type="text" id="req-produto-input" class="form-control produto-busca-input"
+                               placeholder="Digite o nome ou código do produto..." autocomplete="off">
+                        <div class="produto-busca-dropdown" id="req-produto-dropdown"></div>
+                    </div>
+                </div>
+                <div class="form-col-sm" style="max-width: 140px;">
+                    <label class="form-label-compact">Quantidade</label>
+                    <input type="number" id="req-quantidade-input" class="form-control" min="1" value="1">
+                </div>
+                <div class="form-col-sm" style="flex: 0 0 auto;">
+                    <button type="button" id="btn-add-item" class="btn btn-primary" disabled>
+                        <i class="bi bi-plus-lg"></i> Adicionar à Lista
+                    </button>
+                </div>
+            </div>
+            <small class="form-hint" id="req-produto-selecionado-hint">Selecione um produto na busca acima.</small>
+
+            <!-- Catálogo de produtos permitidos ao usuário — fonte de dados para a busca (oculto) -->
+            <select id="req-produtos-catalogo" class="d-none">
+                <option value=""></option>
+                {% for p in produtos %}
+                <option value="{{ p.pk }}"
+                        data-sku="{{ p.sku|default:'' }}"
+                        data-detalhes="{{ p.detalhes|default:'' }}"
+                        data-qtd="{{ p.quantidade }}"
+                        data-unidade="{{ p.get_unidade_medida_display }}">{{ p.nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Lista temporária dos itens selecionados -->
+        <div class="table-card mb-3" id="container-tabela-itens">
+            <div class="table-card-header">
+                <span class="table-card-title"><i class="bi bi-list-check"></i> Itens da Requisição <span class="req">*</span></span>
+                <span class="text-muted small" id="req-total-itens">0 itens</span>
+            </div>
+            <div class="table-responsive">
+                <table class="data-table" id="req-tabela-itens">
+                    <thead>
+                        <tr>
+                            <th>Produto</th>
+                            <th style="width: 130px;">Quantidade</th>
+                            <th class="text-end" style="width: 70px;">Remover</th>
+                        </tr>
+                    </thead>
+                    <tbody id="req-tabela-corpo">
+                        <tr id="req-linha-vazia">
+                            <td colspan="3">
+                                <div class="empty-state-inline">
+                                    <i class="bi bi-inbox"></i>
+                                    <p>Nenhum item adicionado ainda.</p>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-success" id="btn-gerar-pdf">
+                <i class="bi bi-file-earmark-pdf-fill"></i> Gerar PDF para Impressão
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/produto-busca.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var catalogo = document.getElementById('req-produtos-catalogo');
+    var input = document.getElementById('req-produto-input');
+    var dropdown = document.getElementById('req-produto-dropdown');
+    var qtdInput = document.getElementById('req-quantidade-input');
+    var btnAdd = document.getElementById('btn-add-item');
+    var hint = document.getElementById('req-produto-selecionado-hint');
+    var itensJsonInput = document.getElementById('{{ form.itens_json.id_for_label }}');
+    var tbody = document.getElementById('req-tabela-corpo');
+    var linhaVazia = document.getElementById('req-linha-vazia');
+    var totalLabel = document.getElementById('req-total-itens');
+    var formEl = document.getElementById('form-requisicao');
+    var alertContainer = document.getElementById('js-alert-container');
+    var containerTabela = document.getElementById('container-tabela-itens');
+
+    // Mapeamento dos campos do cabeçalho
+    var fieldUnidade = document.getElementById('{{ form.unidade.id_for_label }}');
+    var fieldSolicitante = document.getElementById('{{ form.solicitante.id_for_label }}');
+    var fieldData = document.getElementById('{{ form.data_solicitacao.id_for_label }}');
+
+    var produtoSelecionado = null;
+    var itens = []; // [{ produto: {id, label, sku, unidade}, quantidade: n }]
+
+    function textoTotal() {
+        return itens.length + (itens.length === 1 ? ' item' : ' itens');
+    }
+
+    function atualizarJson() {
+        var payload = itens.map(function (item) {
+            return { produto_id: item.produto.id, quantidade: item.quantidade };
+        });
+        itensJsonInput.value = JSON.stringify(payload);
+    }
+
+    function renderTabela() {
+        tbody.innerHTML = '';
+        totalLabel.textContent = textoTotal();
+
+        if (itens.length === 0) {
+            tbody.appendChild(linhaVazia);
+            return;
+        }
+
+        // Se adicionou item, remove a marcação de erro da tabela
+        containerTabela.classList.remove('table-error-highlight');
+
+        itens.forEach(function (item, index) {
+            var tr = document.createElement('tr');
+
+            // Coluna Produto
+            var tdProd = document.createElement('td');
+            var nomeEl = document.createElement('span');
+            nomeEl.className = 'item-link-dark';
+            nomeEl.style.fontWeight = '700';
+            nomeEl.textContent = item.produto.label;
+            tdProd.appendChild(nomeEl);
+            if (item.produto.sku) {
+                tdProd.appendChild(document.createElement('br'));
+                var codeEl = document.createElement('span');
+                codeEl.className = 'item-code';
+                codeEl.textContent = 'Cód: ' + item.produto.sku;
+                tdProd.appendChild(codeEl);
+            }
+            tr.appendChild(tdProd);
+
+            // Coluna Quantidade (editável)
+            var tdQtd = document.createElement('td');
+            var inputQtd = document.createElement('input');
+            inputQtd.type = 'number';
+            inputQtd.min = '1';
+            inputQtd.className = 'form-control form-control-sm';
+            inputQtd.style.width = '90px';
+            inputQtd.value = item.quantidade;
+            inputQtd.addEventListener('input', function () {
+                var v = parseInt(inputQtd.value, 10);
+                item.quantidade = (v > 0) ? v : 1;
+                atualizarJson();
+            });
+            tdQtd.appendChild(inputQtd);
+            tr.appendChild(tdQtd);
+
+            // Coluna Remover
+            var tdRemove = document.createElement('td');
+            tdRemove.className = 'text-end';
+            var btnRemove = document.createElement('button');
+            btnRemove.type = 'button';
+            btnRemove.className = 'btn-icon btn-icon-danger';
+            btnRemove.title = 'Remover item';
+            btnRemove.innerHTML = '<i class="bi bi-trash"></i>';
+            btnRemove.addEventListener('click', function () {
+                itens.splice(index, 1);
+                renderTabela();
+                atualizarJson();
+            });
+            tdRemove.appendChild(btnRemove);
+            tr.appendChild(tdRemove);
+
+            tbody.appendChild(tr);
+        });
+    }
+
+    attachProdutoBusca(catalogo, input, dropdown, function (produto) {
+        produtoSelecionado = produto;
+        input.value = produto.label;
+        btnAdd.disabled = false;
+        hint.textContent = 'Estoque atual: ' + (produto.qtd || '0') + ' ' + produto.unidade;
+    });
+
+    input.addEventListener('input', function () {
+        produtoSelecionado = null;
+        btnAdd.disabled = true;
+        hint.textContent = 'Selecione um produto na busca acima.';
+    });
+
+    btnAdd.addEventListener('click', function () {
+        if (!produtoSelecionado) {
+            return;
+        }
+        var qtd = parseInt(qtdInput.value, 10);
+        if (!qtd || qtd <= 0) {
+            qtd = 1;
+        }
+
+        var existente = itens.filter(function (it) { return it.produto.id === produtoSelecionado.id; })[0];
+        if (existente) {
+            existente.quantidade += qtd;
+        } else {
+            itens.push({ produto: produtoSelecionado, quantidade: qtd });
+        }
+
+        renderTabela();
+        atualizarJson();
+
+        input.value = '';
+        qtdInput.value = 1;
+        produtoSelecionado = null;
+        btnAdd.disabled = true;
+        hint.textContent = 'Selecione um produto na busca acima.';
+        input.focus();
+    });
+
+    // Remove destaque do campo ao interagir
+    [fieldUnidade, fieldSolicitante, fieldData].forEach(function (element) {
+        if (element) {
+            element.addEventListener('input', function () {
+                this.classList.remove('field-error-highlight');
+            });
+            element.addEventListener('change', function () {
+                this.classList.remove('field-error-highlight');
+            });
+        }
+    });
+
+    // Validação no envio
+    formEl.addEventListener('submit', function (e) {
+        var erros = [];
+        alertContainer.innerHTML = '';
+
+        // Limpa destaques prévios
+        if (fieldUnidade) fieldUnidade.classList.remove('field-error-highlight');
+        if (fieldSolicitante) fieldSolicitante.classList.remove('field-error-highlight');
+        if (fieldData) fieldData.classList.remove('field-error-highlight');
+        containerTabela.classList.remove('table-error-highlight');
+
+        // Validação dos campos do formulário
+        if (fieldUnidade && !fieldUnidade.value.trim()) {
+            erros.push('Unidade Solicitante');
+            fieldUnidade.classList.add('field-error-highlight');
+        }
+        if (fieldSolicitante && !fieldSolicitante.value.trim()) {
+            erros.push('Nome do Solicitante');
+            fieldSolicitante.classList.add('field-error-highlight');
+        }
+        if (fieldData && !fieldData.value.trim()) {
+            erros.push('Data');
+            fieldData.classList.add('field-error-highlight');
+        }
+
+        // Validação da lista de itens
+        if (itens.length === 0) {
+            erros.push('Pelo menos 1 item na lista');
+            containerTabela.classList.add('table-error-highlight');
+        }
+
+        // Se houver erros, cancela a submissão e exibe o alerta
+        if (erros.length > 0) {
+            e.preventDefault();
+            
+            var alertDiv = document.createElement('div');
+            alertDiv.className = 'alert-inline alert-inline-danger mb-3';
+            alertDiv.innerHTML = '<i class="bi bi-exclamation-octagon-fill"></i> Por favor, preencha os campos obrigatórios em falta: <strong>' + erros.join(', ') + '</strong>.';
+            
+            alertContainer.appendChild(alertDiv);
+            alertContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    });
+
+    (function recuperarItensAposErro() {
+        var valorInicial = itensJsonInput.value;
+        if (!valorInicial) {
+            return;
+        }
+        try {
+            var brutos = JSON.parse(valorInicial);
+        } catch (e) {
+            return;
+        }
+        var mapaProdutos = {};
+        Array.prototype.forEach.call(catalogo.options, function (opt) {
+            if (opt.value) {
+                mapaProdutos[opt.value] = {
+                    id: opt.value,
+                    label: opt.textContent.trim(),
+                    sku: opt.getAttribute('data-sku') || '',
+                    unidade: opt.getAttribute('data-unidade') || '',
+                };
+            }
+        });
+        (brutos || []).forEach(function (item) {
+            var produto = mapaProdutos[String(item.produto_id)];
+            if (produto) {
+                itens.push({ produto: produto, quantidade: item.quantidade });
+            }
+        });
+    })();
+
+    renderTabela();
+    atualizarJson();
+});
+</script>
+{% endblock %}

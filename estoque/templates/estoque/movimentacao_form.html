@@ -1,4 +1,5 @@
 {% extends 'estoque/base.html' %}
+{% load static %}
 {% block title %}Registrar Movimentação — Gestão de Estoque{% endblock %}
 
 {% block content %}
@@ -27,10 +28,20 @@
 
             <div class="form-row">
                 <div class="form-col-full">
-                    <label for="{{ form.produto.id_for_label }}" class="form-label-compact">
+                    <label for="produto-busca-input" class="form-label-compact">
                         Produto <span class="req">*</span>
                     </label>
-                    {{ form.produto }}
+                    <!-- CORREÇÃO: campo de busca dinâmica (autocomplete/live search) no lugar do <select> simples -->
+                    <div class="produto-busca-wrap">
+                        <i class="bi bi-search produto-busca-icon"></i>
+                        <input type="text" id="produto-busca-input" class="form-control produto-busca-input"
+                               placeholder="Digite o nome, código ou lote do produto..." autocomplete="off">
+                        <div class="produto-busca-dropdown" id="produto-busca-dropdown"></div>
+                    </div>
+                    <!-- Select original do Django continua no DOM (oculto) — é ele que é enviado no POST -->
+                    <div class="d-none">
+                        {{ form.produto }}
+                    </div>
                     {% for e in form.produto.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
                 </div>
             </div>
@@ -80,4 +91,39 @@
         </form>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<!-- NOVO: busca dinâmica de produtos -->
+<script src="{% static 'js/produto-busca.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var selectOriginal = document.getElementById('{{ form.produto.id_for_label }}');
+    var input = document.getElementById('produto-busca-input');
+    var dropdown = document.getElementById('produto-busca-dropdown');
+
+    if (!selectOriginal || !input || !dropdown) {
+        return;
+    }
+
+    // Se já vier um produto pré-selecionado (ex: link "Registrar Movimentação"
+    // a partir da tela de Produtos, com ?produto=ID), mostra o nome no campo de busca.
+    if (selectOriginal.value) {
+        var optSelecionada = selectOriginal.querySelector('option[value="' + selectOriginal.value + '"]');
+        if (optSelecionada) {
+            input.value = optSelecionada.textContent.trim();
+        }
+    }
+
+    attachProdutoBusca(selectOriginal, input, dropdown, function (produto) {
+        selectOriginal.value = produto.id;
+        input.value = produto.label;
+    });
+
+    // Se o usuário editar o texto sem selecionar um novo item, invalida a seleção anterior.
+    input.addEventListener('input', function () {
+        selectOriginal.value = '';
+    });
+});
+</script>
 {% endblock %}

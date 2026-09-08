@@ -57,7 +57,7 @@
                         <th class="text-end">Opções</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="tbody-produtos">
                 {% for produto in produtos %}
                     <tr class="{% if produto.vencido %}row-vencido{% elif produto.estoque_baixo %}row-alerta{% endif %}">
                         <td>
@@ -153,7 +153,7 @@
                         </td>
                     </tr>
                 {% empty %}
-                    <tr>
+                    <tr id="tr-vazio-inicial">
                         <td colspan="{% if not unidade_atual %}7{% else %}6{% endif %}">
                             <div class="empty-state-inline">
                                 <i class="bi bi-inbox"></i>
@@ -170,7 +170,192 @@
         </div>
     </div>
 
-    {% include 'estoque/_paginacao.html' %}
+    <div id="paginacao-normal">
+        {% include 'estoque/_paginacao.html' %}
+    </div>
+
+    <!-- Mensagem de nenhum resultado AJAX (oculto por padrão) -->
+    <div id="ajax-vazio" style="display:none;" class="table-card">
+        <div class="empty-state-inline">
+            <i class="bi bi-search"></i>
+            <p>Nenhum produto encontrado para esta busca.</p>
+        </div>
+    </div>
 
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+    var urlBusca = '{% url "estoque:produto_busca_ajax" %}';
+    var csrfToken = '{{ csrf_token }}';
+
+    // Captura o input pelo ID do Django 'id_q' ou pelo fallback 'id_busca_produto'
+    var inputBusca = document.getElementById('id_q') || document.getElementById('id_busca_produto') || document.querySelector('input[name="q"]');
+    var selectCategoria = document.getElementById('id_categoria') || document.querySelector('select[name="categoria"]');
+    var selectSituacao = document.querySelector('select[name="situacao"]');
+    var tbody = document.getElementById('tbody-produtos');
+    var paginacaoNormal = document.getElementById('paginacao-normal');
+    var ajaxVazio = document.getElementById('ajax-vazio');
+    var formFiltro = document.getElementById('form-filtro-produtos');
+
+    if (!inputBusca || !tbody) return;
+
+    var timer = null;
+    var modoAjax = false;
+
+    // ... (restante da sua função renderizarLinhas e buscar permanece idêntico) ...
+
+    // Renderiza linhas da tabela a partir dos dados JSON
+    function renderizarLinhas(dados) {
+        var produtos = dados.produtos;
+        var exibeUnidade = dados.exibe_unidade;
+
+        if (produtos.length === 0) {
+            tbody.innerHTML = '';
+            ajaxVazio.style.display = '';
+            paginacaoNormal.style.display = 'none';
+            return;
+        }
+
+        ajaxVazio.style.display = 'none';
+        paginacaoNormal.style.display = 'none';
+
+        var html = '';
+        produtos.forEach(function (p) {
+            var rowClass = p.vencido ? 'row-vencido' : (p.estoque_baixo ? 'row-alerta' : '');
+
+            // Coluna Produto
+            var colProduto = '<a href="' + p.url_detalhe + '" class="item-link-dark">' + esc(p.nome) + '</a>';
+            if (p.detalhes) colProduto += ' <span class="item-detail">' + esc(p.detalhes) + '</span>';
+            if (p.sku) colProduto += ' <span class="item-code"><i class="bi bi-upc"></i> ' + esc(p.sku) + '</span>';
+
+            // Coluna Categoria
+            var colCat = p.categoria
+                ? '<span class="cat-tag">' + esc(p.categoria) + '</span>'
+                : '<span class="text-muted">—</span>';
+
+            // Coluna Unidade (condicional)
+            var colUnidade = '';
+            if (exibeUnidade) {
+                if (p.unidade_nome) {
+                    var labelUnidade = p.unidade_codigo ? p.unidade_codigo + ' — ' + esc(p.unidade_nome.split('—').pop().trim()) : esc(p.unidade_nome);
+                    colUnidade = '<td><span class="cat-tag"><i class="bi bi-building"></i> ' + labelUnidade + '</span></td>';
+                } else {
+                    colUnidade = '<td><span class="text-muted">—</span></td>';
+                }
+            }
+
+            // Coluna Quantidade
+            var qtyClass = 'qty-text' + (p.estoque_baixo ? ' qty-text-danger' : '');
+            var colQty = '<span class="' + qtyClass + '">' + p.quantidade + ' <small>' + esc(p.unidade_medida) + '</small></span>';
+            if (p.estoque_baixo) colQty += ' <span class="status-tag status-danger">Baixo</span>';
+
+            // Coluna Validade
+            var colVal = '<span class="text-muted">—</span>';
+            if (p.data_validade) {
+                if (p.vencido) {
+                    colVal = '<span class="status-tag status-danger"><i class="bi bi-x-circle"></i> Vencido</span>';
+                } else if (p.venc_proximo) {
+                    colVal = '<span class="status-tag status-warning"><i class="bi bi-clock"></i> ' + p.data_validade + '</span>';
+                } else {
+                    colVal = '<span class="date-text">' + p.data_validade + '</span>';
+                }
+            }
+
+            // Ação Rápida
+            var colAcao = '<form action="' + p.url_mov_rapida + '" method="post" class="acao-rapida-form" id="form-rapida-' + p.pk + '">'
+                + '<input type="hidden" name="csrfmiddlewaretoken" value="' + csrfToken + '">'
+                + '<input type="hidden" name="next" value="' + window.location.pathname + window.location.search + '">'
+                + '<input type="number" name="quantidade" value="1" min="1" max="9999" class="acao-rapida-qty" title="Quantidade" aria-label="Quantidade">'
+                + '<button type="submit" name="tipo" value="ENTRADA" class="btn-entrada" title="Dar entrada no estoque" id="btn-entrada-' + p.pk + '"><i class="bi bi-plus-lg"></i></button>'
+                + '<button type="submit" name="tipo" value="SAIDA" class="btn-saida" title="Registrar saída do estoque" id="btn-saida-' + p.pk + '"><i class="bi bi-dash-lg"></i></button>'
+                + '</form>';
+
+            // Opções
+            var colOpcoes = '<div class="btn-group-compact">'
+                + '<a href="' + p.url_detalhe + '" class="btn-icon" title="Ver detalhes" id="btn-ver-' + p.pk + '"><i class="bi bi-eye"></i></a>'
+                + '<a href="' + p.url_editar + '" class="btn-icon" title="Editar" id="btn-editar-' + p.pk + '"><i class="bi bi-pencil"></i></a>'
+                + '<a href="' + p.url_excluir + '" class="btn-icon btn-icon-danger" title="Excluir" id="btn-excluir-' + p.pk + '"><i class="bi bi-trash"></i></a>'
+                + '</div>';
+
+            html += '<tr class="' + rowClass + '">'
+                + '<td>' + colProduto + '</td>'
+                + '<td>' + colCat + '</td>'
+                + colUnidade
+                + '<td>' + colQty + '</td>'
+                + '<td>' + colVal + '</td>'
+                + '<td>' + colAcao + '</td>'
+                + '<td class="text-end">' + colOpcoes + '</td>'
+                + '</tr>';
+        });
+
+        tbody.innerHTML = html;
+    }
+
+    function esc(str) {
+        if (!str) return '';
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function buscar() {
+        var termo = inputBusca.value.trim();
+        var categoria = selectCategoria ? selectCategoria.value : '';
+        var situacao = selectSituacao ? selectSituacao.value : '';
+
+        // Se tudo vazio, volta para o modo normal (renderização Django)
+        if (!termo && !categoria && !situacao) {
+            if (modoAjax) {
+                location.href = window.location.pathname;
+            }
+            return;
+        }
+
+        var params = new URLSearchParams();
+        if (termo) params.set('q', termo);
+        if (categoria) params.set('categoria', categoria);
+        if (situacao) params.set('situacao', situacao);
+
+        modoAjax = true;
+
+        fetch(urlBusca + '?' + params.toString(), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(function (r) { return r.json(); })
+        .then(renderizarLinhas)
+        .catch(function () {
+            // Em caso de erro, deixa o formulário funcionar normalmente
+            modoAjax = false;
+        });
+    }
+
+    // Busca ao digitar (debounce 300ms)
+    inputBusca.addEventListener('input', function () {
+        clearTimeout(timer);
+        timer = setTimeout(buscar, 300);
+    });
+
+    // Busca ao mudar categoria/situação
+    if (selectCategoria) selectCategoria.addEventListener('change', function () { clearTimeout(timer); buscar(); });
+    if (selectSituacao) selectSituacao.addEventListener('change', function () { clearTimeout(timer); buscar(); });
+
+    // Submissão normal do form ainda funciona (para bookmarks, etc.)
+    // Apenas bloqueamos o submit padrão quando o input tem valor para evitar reload desnecessário
+    formFiltro.addEventListener('submit', function (e) {
+        if (modoAjax || inputBusca.value.trim() || (selectCategoria && selectCategoria.value) || (selectSituacao && selectSituacao.value)) {
+            e.preventDefault();
+            buscar();
+        }
+    });
+
+    // Se a página carregou com parâmetros na URL, executa a busca AJAX imediatamente
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('q') || params.get('categoria') || params.get('situacao')) {
+        // Já foi renderizado pelo Django com os filtros — não precisa rebuscar,
+        // mas ativa o modo AJAX para futuras interações do usuário.
+        modoAjax = false; // mantém normal para a carga inicial com paginação
+    }
+})();
+</script>
 {% endblock %}

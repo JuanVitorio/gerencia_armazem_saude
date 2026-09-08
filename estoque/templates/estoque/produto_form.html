@@ -145,7 +145,7 @@
     // Tipos que mostram rastreabilidade (lote)
     var TIPOS_RASTREABILIDADE = ['MEDICAMENTO', 'VACINA'];
     // Tipos que mostram SKU
-    var TIPOS_SKU = ['MEDICAMENTO', 'MATERIAL_ODONTOLOGICO'];
+    var TIPOS_SKU = ['MEDICAMENTO', 'MATERIAL_ODONTOLOGICO', 'MATERIAL_HOSPITALAR'];
     // Data de Validade NÃO é mais condicional — fica sempre visível no
     // formulário (é opcional, então não faz mal aparecer pra qualquer
     // categoria; várias categorias além de Medicamento/Vacina podem ter
@@ -169,6 +169,22 @@
 
     selectCategoria.addEventListener('change', aplicarCampos);
     aplicarCampos();
+
+    // Enter na Categoria avança para o próximo campo focalizável
+    selectCategoria.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            var form = document.getElementById('form-produto');
+            if (!form) return;
+            var focusable = Array.from(
+                form.querySelectorAll('input:not([type=hidden]), select, textarea, button[type=submit]')
+            ).filter(function (el) { return !el.disabled && el.offsetParent !== null; });
+            var idx = focusable.indexOf(selectCategoria);
+            if (idx >= 0 && idx < focusable.length - 1) {
+                focusable[idx + 1].focus();
+            }
+        }
+    });
 
     // Animação do details/summary
     document.querySelectorAll('details').forEach(function(el) {
