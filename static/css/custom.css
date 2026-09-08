@@ -1093,3 +1093,83 @@ body {
 }
 
 .alert-inline-danger { background-color: var(--color-danger-light); color: var(--color-danger); }
+
+/* ==========================================================================
+   NOVO: Busca Dinâmica de Produtos (autocomplete / live search)
+   Usado em movimentacao_form.html e requisicao_form.html.
+   ========================================================================== */
+.produto-busca-wrap {
+    position: relative;
+}
+
+.produto-busca-icon {
+    position: absolute;
+    left: 0.65rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    pointer-events: none;
+}
+
+.produto-busca-input {
+    padding-left: 2rem !important;
+}
+
+.produto-busca-dropdown {
+    display: none;
+    position: absolute;
+    z-index: 20;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    max-height: 260px;
+    overflow-y: auto;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color-strong);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+}
+
+.produto-busca-dropdown.show {
+    display: block;
+}
+
+.produto-busca-item {
+    display: flex;
+    flex-direction: column;
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.produto-busca-item:last-child { border-bottom: none; }
+
+.produto-busca-item:hover,
+.produto-busca-item.active {
+    background-color: var(--color-primary-light);
+}
+
+.produto-busca-item-nome {
+    font-weight: 700;
+    font-size: 0.875rem;
+    color: var(--text-main);
+}
+
+.produto-busca-item-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.1rem;
+}
+
+.produto-busca-empty {
+    padding: 0.75rem;
+    text-align: center;
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+}
+
+/* Tabela temporária de itens da requisição */
+#req-tabela-itens .form-control-sm {
+    padding: 0.25rem 0.5rem;
+}
