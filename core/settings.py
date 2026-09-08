@@ -85,7 +85,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Redireciona login/logout
 LOGIN_URL = 'login'
-LOGIN_REDIRECT_URL = 'estoque:dashboard'
+LOGIN_REDIRECT_URL = 'estoque:produto_list'
 LOGOUT_REDIRECT_URL = 'login'
 
 # Regras de negócio do estoque

@@ -15,6 +15,7 @@ class Categoria(models.Model):
     MEDICAMENTO = 'MEDICAMENTO'
     VACINA = 'VACINA'
     MATERIAL_ODONTOLOGICO = 'MATERIAL_ODONTOLOGICO'
+    MATERIAL_HOSPITALAR = 'MATERIAL_HOSPITALAR'
     MATERIAL_LIMPEZA = 'MATERIAL_LIMPEZA'
     INSUMO = 'INSUMO'
     OUTRO = 'OUTRO'
@@ -24,6 +25,7 @@ class Categoria(models.Model):
         (MEDICAMENTO, 'Medicamento'),
         (VACINA, 'Vacina'),
         (MATERIAL_ODONTOLOGICO, 'Material Odontológico'),
+        (MATERIAL_HOSPITALAR, 'Material Hospitalar'),
         (MATERIAL_LIMPEZA, 'Material de Limpeza'),
         (INSUMO, 'Insumo'),
         (OUTRO, 'Outro'),
@@ -32,7 +34,7 @@ class Categoria(models.Model):
     # Tipos que requerem campos de rastreabilidade (lote, validade)
     TIPOS_COM_RASTREABILIDADE = {MEDICAMENTO, VACINA}
     # Tipos que usam código/SKU
-    TIPOS_COM_SKU = {MEDICAMENTO, MATERIAL_ODONTOLOGICO}
+    TIPOS_COM_SKU = {MEDICAMENTO, MATERIAL_ODONTOLOGICO, MATERIAL_HOSPITALAR}
 
     nome = models.CharField('Nome', max_length=100, unique=True)
     tipo = models.CharField(

@@ -1,3 +1,5 @@
+import json
+
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import User
@@ -38,6 +40,32 @@ class CategoriaSelect(forms.Select):
         return option
 
 
+# --- NOVO: Select que expõe metadados do produto via data-* para o JS de
+# busca dinâmica (static/js/produto-busca.js), usado no form de Movimentação
+# e na tela de Requisição de Materiais. ---
+class ProdutoSelect(forms.Select):
+    """
+    Select que expõe sku, detalhes, quantidade em estoque e unidade de
+    medida de cada produto via atributos data-* em cada <option>. O JS de
+    busca dinâmica lê esses atributos para filtrar e exibir o dropdown
+    sem precisar de nenhuma chamada AJAX.
+    """
+
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex, attrs)
+        if value:
+            try:
+                produto = Produto.objects.get(pk=value)
+            except (Produto.DoesNotExist, ValueError, TypeError):
+                produto = None
+            if produto:
+                option['attrs']['data-sku'] = produto.sku
+                option['attrs']['data-detalhes'] = produto.detalhes
+                option['attrs']['data-qtd'] = produto.quantidade
+                option['attrs']['data-unidade'] = produto.get_unidade_medida_display()
+        return option
+
+
 class ProdutoForm(BaseFormMixin, forms.ModelForm):
     class Meta:
         model = Produto
@@ -66,6 +94,9 @@ class MovimentacaoForm(BaseFormMixin, forms.ModelForm):
         model = Movimentacao
         fields = ['produto', 'tipo', 'quantidade', 'motivo']
         widgets = {
+            # CORREÇÃO: troca o <select> simples por ProdutoSelect, que expõe
+            # data-sku/data-detalhes/data-qtd/data-unidade para a busca dinâmica.
+            'produto': ProdutoSelect(),
             'motivo': forms.TextInput(attrs={'placeholder': 'Ex: Recebimento de NF, uso em atendimento...'}),
         }
 
@@ -248,3 +279,64 @@ class FuncionarioFiltroForm(forms.Form):
         empty_label='Todas as unidades',
         widget=forms.Select(attrs={'class': 'form-control'}),
     )
+
+
+# ---------------------------------------------------------------------------
+# NOVO: Requisição de Materiais (Lista de Faltantes + Gerador de PDF)
+# ---------------------------------------------------------------------------
+
+class RequisicaoForm(BaseFormMixin, forms.Form):
+    """
+    Cabeçalho da requisição (unidade/solicitante/data) + a lista de itens,
+    que chega serializada em JSON via um campo oculto (itens_json). A
+    lista em si é montada inteiramente no cliente (JS), pois o usuário
+    adiciona/edita/remove itens dinamicamente antes de gerar o PDF —
+    não faz sentido ida-e-volta ao servidor a cada item adicionado.
+    """
+    unidade = forms.ModelChoiceField(
+        label='Unidade Solicitante',
+        queryset=Unidade.objects.filter(ativa=True),
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
+    solicitante = forms.CharField(
+        label='Nome do Solicitante', max_length=150,
+        widget=forms.TextInput(attrs={'placeholder': 'Nome completo de quem está solicitando'}),
+    )
+    data_solicitacao = forms.DateField(
+        label='Data', widget=forms.DateInput(attrs={'type': 'date'}),
+    )
+    itens_json = forms.CharField(widget=forms.HiddenInput())
+
+    def __init__(self, *args, unidade_queryset=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if unidade_queryset is not None:
+            # Usuário de uma unidade específica só pode requisitar em nome
+            # dela — o queryset restrito impede que outro id seja forjado
+            # no POST (mesmo padrão usado em MovimentacaoForm.produto).
+            self.fields['unidade'].queryset = unidade_queryset
+
+    def clean_itens_json(self):
+        raw = self.cleaned_data.get('itens_json', '')
+        try:
+            dados = json.loads(raw)
+        except (TypeError, ValueError):
+            raise forms.ValidationError('Lista de itens inválida.')
+        if not isinstance(dados, list) or not dados:
+            raise forms.ValidationError('Adicione ao menos um item à lista antes de gerar o PDF.')
+
+        itens = []
+        for item in dados:
+            if not isinstance(item, dict):
+                continue
+            try:
+                produto_id = int(item.get('produto_id'))
+                quantidade = int(item.get('quantidade'))
+            except (TypeError, ValueError):
+                continue
+            if quantidade <= 0:
+                continue
+            itens.append({'produto_id': produto_id, 'quantidade': quantidade})
+
+        if not itens:
+            raise forms.ValidationError('Nenhum item válido encontrado na lista.')
+        return itens
