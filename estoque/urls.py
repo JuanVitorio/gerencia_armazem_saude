@@ -18,6 +18,7 @@ urlpatterns = [
     # Produtos
     path('produtos/', views.ProdutoListView.as_view(), name='produto_list'),
     path('produtos/novo/', views.ProdutoCreateView.as_view(), name='produto_create'),
+    path('produtos/busca-ajax/', views.ProdutoBuscaAjaxView.as_view(), name='produto_busca_ajax'),
     path('produtos/<int:pk>/', views.ProdutoDetailView.as_view(), name='produto_detail'),
     path('produtos/<int:pk>/editar/', views.ProdutoUpdateView.as_view(), name='produto_update'),
     path('produtos/<int:pk>/excluir/', views.ProdutoDeleteView.as_view(), name='produto_delete'),
@@ -28,6 +29,9 @@ urlpatterns = [
     path('movimentacoes/nova/', views.MovimentacaoCreateView.as_view(), name='movimentacao_create'),
     path('movimentacoes/<int:pk>/', views.MovimentacaoDetailView.as_view(), name='movimentacao_detail'),
     path('movimentacoes/<int:pk>/excluir/', views.MovimentacaoDeleteView.as_view(), name='movimentacao_delete'),
+
+    # NOVO: Requisição de Materiais (Lista de Faltantes + Gerador de PDF)
+    path('requisicao/', views.RequisicaoView.as_view(), name='requisicao'),
 
     # Usuários (admin only)
     path('usuarios/', views.UsuarioListView.as_view(), name='usuario_list'),

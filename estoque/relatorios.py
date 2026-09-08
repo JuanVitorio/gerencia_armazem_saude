@@ -414,3 +414,162 @@ def relatorio_lancamentos_folgas(unidade=None, data_inicio=None, data_fim=None, 
         f"Dias creditados: <b>{total_creditos}</b> | Dias debitados: <b>{total_debitos}</b>"
     )
     return _criar_pdf_base(f"Relatório de {titulo_tipo}", sub, rows, widths, resumo)
+
+# ---------------------------------------------------------------------------
+# NOVO: Requisição de Materiais (Lista de Faltantes)
+# ---------------------------------------------------------------------------
+
+def relatorio_requisicao(unidade, solicitante, data_solicitacao, itens):
+    """
+    Gera o PDF de Requisição de Materiais para impressão e assinatura.
+
+    Diferente dos demais relatórios (que reaproveitam _criar_pdf_base),
+    este documento tem cabeçalho com dados do solicitante e um rodapé com
+    campos de assinatura — por isso é montado à parte, mas seguindo o
+    mesmo estilo visual (cores, tipografia e numeração de página via
+    NumberedCanvas) para manter a identidade visual do sistema.
+
+    `itens` é uma lista de dicts: [{'produto': <Produto>, 'quantidade': int}, ...]
+    """
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=1.5 * cm,
+        rightMargin=1.5 * cm,
+        topMargin=1.5 * cm,
+        bottomMargin=1.8 * cm,
+    )
+
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        'ReqTitle', parent=styles['Heading1'], fontName='Helvetica-Bold',
+        fontSize=16, leading=20, textColor=colors.HexColor('#0F172A'), spaceAfter=2,
+    )
+    subtitle_style = ParagraphStyle(
+        'ReqSubtitle', parent=styles['Normal'], fontName='Helvetica',
+        fontSize=9, leading=12, textColor=colors.HexColor('#64748B'), spaceAfter=10,
+    )
+    info_label_style = ParagraphStyle(
+        'ReqInfoLabel', parent=styles['Normal'], fontName='Helvetica-Bold',
+        fontSize=9, leading=13, textColor=colors.HexColor('#64748B'),
+    )
+    info_value_style = ParagraphStyle(
+        'ReqInfoValue', parent=styles['Normal'], fontName='Helvetica-Bold',
+        fontSize=11, leading=14, textColor=colors.HexColor('#0F172A'),
+    )
+    cell_head_style = ParagraphStyle(
+        'ReqCellHead', parent=styles['Normal'], fontName='Helvetica-Bold',
+        fontSize=9, leading=12, textColor=colors.HexColor('#1E293B'),
+    )
+    cell_body_style = ParagraphStyle(
+        'ReqCellBody', parent=styles['Normal'], fontName='Helvetica',
+        fontSize=9, leading=12, textColor=colors.HexColor('#0F172A'),
+    )
+    sign_label_style = ParagraphStyle(
+        'ReqSignLabel', parent=styles['Normal'], fontName='Helvetica-Bold',
+        fontSize=9, leading=12, textColor=colors.HexColor('#334155'), alignment=1,
+    )
+
+    elements = []
+
+    # --- Cabeçalho ---
+    elements.append(Paragraph('Requisição de Materiais ao Depósito', title_style))
+    elements.append(Paragraph(
+        'Solicitação de reposição de itens em falta na unidade — apresentar assinado ao responsável pelo depósito.',
+        subtitle_style,
+    ))
+    elements.append(HRFlowable(width='100%', thickness=1, color=colors.HexColor('#0284C7'), spaceAfter=12))
+
+    unidade_nome = unidade.nome if unidade else '—'
+    data_str = data_solicitacao.strftime('%d/%m/%Y') if data_solicitacao else '—'
+
+    info_table = Table(
+        [
+            [Paragraph('UNIDADE SOLICITANTE', info_label_style),
+             Paragraph('SOLICITANTE', info_label_style),
+             Paragraph('DATA', info_label_style)],
+            [Paragraph(unidade_nome, info_value_style),
+             Paragraph(solicitante or '—', info_value_style),
+             Paragraph(data_str, info_value_style)],
+        ],
+        colWidths=[7.5 * cm, 6.5 * cm, 3.0 * cm],
+        style=TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F1F5F9')),
+            ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#E2E8F0')),
+            ('TOPPADDING', (0, 0), (-1, 0), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 2),
+            ('TOPPADDING', (0, 1), (-1, 1), 2),
+            ('BOTTOMPADDING', (0, 1), (-1, 1), 8),
+            ('LEFTPADDING', (0, 0), (-1, -1), 10),
+        ]),
+    )
+    elements.append(info_table)
+    elements.append(Spacer(1, 0.6 * cm))
+
+    # --- Tabela de itens ---
+    header = ['Código/SKU', 'Produto', 'Qtd. Solicitada', 'Observações']
+    rows = [[Paragraph(h, cell_head_style) for h in header]]
+
+    for item in itens:
+        produto = item['produto']
+        quantidade = item['quantidade']
+        codigo = produto.sku or produto.lote or '—'
+        nome_str = produto.nome
+        if produto.detalhes:
+            nome_str += f"<br/><font size='7.5' color='#64748B'>{produto.detalhes}</font>"
+        qtd_str = f"{quantidade} {produto.get_unidade_medida_display()}"
+        rows.append([
+            Paragraph(codigo, cell_body_style),
+            Paragraph(nome_str, cell_body_style),
+            Paragraph(f"<b>{qtd_str}</b>", cell_body_style),
+            Paragraph('&nbsp;', cell_body_style),  # espaço em branco para anotação manual do depósito
+        ])
+
+    col_widths = [2.8 * cm, 8.2 * cm, 3.5 * cm, 2.5 * cm]
+    t_style = TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F1F5F9')),
+        ('TOPPADDING', (0, 0), (-1, 0), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E2E8F0')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F8FAFC')]),
+        ('TOPPADDING', (0, 1), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 8),
+        # Linha extra na coluna de Observações para anotação manual
+        ('LINEBELOW', (3, 1), (3, -1), 0.5, colors.HexColor('#CBD5E1')),
+    ])
+    elements.append(Table(rows, colWidths=col_widths, style=t_style))
+    elements.append(Spacer(1, 0.4 * cm))
+
+    total_itens = len(itens)
+    resumo_style = ParagraphStyle(
+        'ReqResumo', parent=styles['Normal'], fontName='Helvetica-Bold',
+        fontSize=9, leading=13, textColor=colors.HexColor('#0284C7'),
+    )
+    plural = 'item' if total_itens == 1 else 'itens'
+    elements.append(Paragraph(f"Total de {total_itens} {plural} solicitado(s).", resumo_style))
+
+    # --- Assinaturas ---
+    elements.append(Spacer(1, 1.5 * cm))
+    linha_assinatura = '_' * 42
+    sign_table = Table(
+        [
+            [Paragraph(linha_assinatura, sign_label_style), Paragraph(linha_assinatura, sign_label_style)],
+            [Paragraph('Assinatura do Solicitante', sign_label_style),
+             Paragraph('Assinatura de Liberação (Depósito)', sign_label_style)],
+        ],
+        colWidths=[8.25 * cm, 8.25 * cm],
+        style=TableStyle([
+            ('TOPPADDING', (0, 0), (-1, 0), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 4),
+            ('TOPPADDING', (0, 1), (-1, 1), 2),
+        ]),
+    )
+    elements.append(KeepTogether(sign_table))
+
+    doc.build(elements, canvasmaker=NumberedCanvas())
+    buffer.seek(0)
+    return buffer

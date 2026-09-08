@@ -22,7 +22,7 @@ from .forms import (
     EventoFolgaForm, FuncionarioFiltroForm, FuncionarioForm, LancamentoFolgaForm,
     MovimentacaoFiltroForm, MovimentacaoForm,
     PerfilUsuarioForm, ProdutoFiltroForm, ProdutoForm,
-    UsuarioForm,
+    RequisicaoForm, UsuarioForm,
 )
 from .models import (
     Categoria, EventoFolga, Funcionario, LancamentoFolga, Movimentacao, PerfilUsuario, Produto, Unidade,
@@ -333,6 +333,65 @@ class ProdutoDetailView(LoginRequiredMixin, DetailView):
         context['movimentacoes'] = self.object.movimentacoes.select_related('usuario').all()[:30]
         return context
 
+class ProdutoBuscaAjaxView(LoginRequiredMixin, View):
+    def get(self, request, *args, **kwargs):
+        termo = request.GET.get('q', '').strip()
+        categoria_id = request.GET.get('categoria', '').strip()
+        situacao = request.GET.get('situacao', '').strip()
+
+        unidade_atual = get_unidade_do_usuario(request.user)
+        
+        # Query base
+        qs = Produto.objects.all()
+
+        if unidade_atual:
+            qs = qs.filter(unidade=unidade_atual)
+
+        if termo:
+            qs = qs.filter(
+                Q(nome__icontains=termo) | 
+                Q(sku__icontains=termo) | 
+                Q(detalhes__icontains=termo)
+            )
+
+        if categoria_id:
+            qs = qs.filter(categoria_id=categoria_id)
+
+        # Regras de situação (Ajuste os filtros conforme suas propriedades no model)
+        # ex: 'vencido', 'baixo'
+        if situacao == 'vencido':
+            qs = [p for p in qs if getattr(p, 'vencido', False)]
+        elif situacao == 'baixo':
+            qs = [p for p in qs if getattr(p, 'estoque_baixo', False)]
+
+        produtos_data = []
+        for p in qs[:50]:  # Limite para performance
+            data_val = p.data_validade.strftime('%d/%m/%Y') if getattr(p, 'data_validade', None) else None
+            
+            produtos_data.append({
+                'pk': p.pk,
+                'nome': p.nome,
+                'detalhes': getattr(p, 'detalhes', ''),
+                'sku': getattr(p, 'sku', ''),
+                'categoria': p.categoria.nome if p.categoria else None,
+                'unidade_nome': str(p.unidade) if getattr(p, 'unidade', None) else '',
+                'unidade_codigo': getattr(p.unidade, 'codigo', '') if getattr(p, 'unidade', None) else '',
+                'quantidade': p.quantidade,
+                'unidade_medida': p.get_unidade_medida_display() if hasattr(p, 'get_unidade_medida_display') else '',
+                'estoque_baixo': getattr(p, 'estoque_baixo', False),
+                'vencido': getattr(p, 'vencido', False),
+                'venc_proximo': getattr(p, 'venc_proximo', False),
+                'data_validade': data_val,
+                'url_detalhe': p.get_absolute_url() if hasattr(p, 'get_absolute_url') else reverse('estoque:produto_detail', args=[p.pk]),
+                'url_editar': reverse('estoque:produto_update', args=[p.pk]),
+                'url_excluir': reverse('estoque:produto_delete', args=[p.pk]),
+                'url_mov_rapida': reverse('estoque:movimentacao_rapida', args=[p.pk]),
+            })
+
+        return JsonResponse({
+            'produtos': produtos_data,
+            'exibe_unidade': unidade_atual is None
+        })
 
 class ProdutoCreateView(LoginRequiredMixin, View):
     """
@@ -572,6 +631,87 @@ class MovimentacaoCreateView(LoginRequiredMixin, CreateView):
             return self.form_invalid(form)
         messages.success(self.request, 'Movimentação registrada com sucesso.')
         return response
+
+
+# ---------------------------------------------------------------------------
+# NOVO: Requisição de Materiais (Lista de Faltantes + Gerador de PDF)
+# ---------------------------------------------------------------------------
+
+class RequisicaoView(LoginRequiredMixin, View):
+    """
+    Tela onde o usuário de uma unidade monta uma lista de itens em falta
+    (produto + quantidade) e gera um PDF formatado para impressão, a ser
+    assinado e entregue ao responsável pelo depósito.
+
+    A lista de itens é montada no cliente (JS) e chega ao POST serializada
+    em JSON (ver RequisicaoForm.clean_itens_json). Aqui revalidamos cada
+    produto contra o queryset permitido para o usuário — o mesmo filtro
+    por unidade usado em toda a aplicação — para não permitir que um
+    produto de outra unidade seja injetado no PDF.
+    """
+    template_name = 'estoque/requisicao_form.html'
+
+    def _produtos_disponiveis(self, request):
+        return filtrar_produtos_por_usuario(
+            request.user,
+            Produto.objects.filter(ativo=True).select_related('categoria', 'unidade'),
+        ).order_by('nome')
+
+    def _unidade_queryset(self, unidade_usuario):
+        # Usuário comum só pode requisitar em nome da própria unidade;
+        # admin (unidade_usuario is None) pode escolher qualquer uma.
+        if unidade_usuario is not None:
+            return Unidade.objects.filter(pk=unidade_usuario.pk)
+        return None
+
+    def get(self, request):
+        unidade_usuario = get_unidade_do_usuario(request.user)
+        initial = {
+            'solicitante': request.user.get_full_name() or request.user.username,
+            'data_solicitacao': timezone.localdate(),
+        }
+        if unidade_usuario is not None:
+            initial['unidade'] = unidade_usuario.pk
+
+        form = RequisicaoForm(initial=initial, unidade_queryset=self._unidade_queryset(unidade_usuario))
+        return render(request, self.template_name, {
+            'form': form,
+            'produtos': self._produtos_disponiveis(request),
+        })
+
+    def post(self, request):
+        unidade_usuario = get_unidade_do_usuario(request.user)
+        form = RequisicaoForm(request.POST, unidade_queryset=self._unidade_queryset(unidade_usuario))
+        produtos_disponiveis = self._produtos_disponiveis(request)
+
+        if form.is_valid():
+            itens_brutos = form.cleaned_data['itens_json']
+            produtos_map = produtos_disponiveis.filter(
+                pk__in=[item['produto_id'] for item in itens_brutos]
+            ).in_bulk()
+
+            itens_finais = []
+            for item in itens_brutos:
+                produto = produtos_map.get(item['produto_id'])
+                if produto is None:
+                    continue  # produto inválido ou fora do alcance do usuário — ignorado silenciosamente
+                itens_finais.append({'produto': produto, 'quantidade': item['quantidade']})
+
+            if not itens_finais:
+                messages.error(request, 'Nenhum item válido encontrado na lista. Adicione os itens novamente.')
+                return render(request, self.template_name, {'form': form, 'produtos': produtos_disponiveis})
+
+            buffer = relatorios.relatorio_requisicao(
+                unidade=form.cleaned_data['unidade'],
+                solicitante=form.cleaned_data['solicitante'],
+                data_solicitacao=form.cleaned_data['data_solicitacao'],
+                itens=itens_finais,
+            )
+            response = HttpResponse(buffer, content_type='application/pdf')
+            response['Content-Disposition'] = 'inline; filename="requisicao_materiais.pdf"'
+            return response
+
+        return render(request, self.template_name, {'form': form, 'produtos': produtos_disponiveis})
 
 
 # ---------------------------------------------------------------------------
