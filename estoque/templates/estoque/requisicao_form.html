@@ -23,12 +23,26 @@
             <h1 class="page-title">
                 <i class="bi bi-clipboard2-check text-primary"></i> Requisição de Materiais
             </h1>
-            <p class="page-subtitle">Monte a lista de itens em falta e gere um documento para assinatura e entrega ao depósito.</p>
+            <p class="page-subtitle">
+                Monte a lista de itens em falta e gere um documento para assinatura e entrega ao depósito.
+                {% if estoque_central %}
+                Os produtos pesquisados são do estoque da
+                <strong>{% for u in estoque_central %}{{ u.nome }}{% if not forloop.last %}, {% endif %}{% endfor %}</strong>.
+                {% endif %}
+            </p>
         </div>
     </div>
 
     <!-- Div dinamica para mensagens de alerta via JS -->
     <div id="js-alert-container"></div>
+
+    {% if not estoque_central %}
+    <div class="alert-inline alert-inline-danger">
+        <i class="bi bi-exclamation-octagon-fill"></i>
+        Nenhuma unidade do tipo <strong>Secretaria</strong> ativa foi encontrada, então não há estoque central
+        para pesquisar produtos. Cadastre a Secretaria de Saúde em Unidades.
+    </div>
+    {% endif %}
 
     {% for error in form.non_field_errors %}
     <div class="alert-inline alert-inline-danger">
@@ -82,7 +96,7 @@
                     <div class="produto-busca-wrap">
                         <i class="bi bi-search produto-busca-icon"></i>
                         <input type="text" id="req-produto-input" class="form-control produto-busca-input"
-                               placeholder="Digite o nome ou código do produto..." autocomplete="off">
+                               placeholder="Pesquise no estoque da Secretaria: nome ou código do produto..." autocomplete="off">
                         <div class="produto-busca-dropdown" id="req-produto-dropdown"></div>
                     </div>
                 </div>
@@ -98,7 +112,7 @@
             </div>
             <small class="form-hint" id="req-produto-selecionado-hint">Selecione um produto na busca acima.</small>
 
-            <!-- Catálogo de produtos permitidos ao usuário — fonte de dados para a busca (oculto) -->
+            <!-- Catálogo do estoque central (Secretaria) — fonte de dados para a busca (oculto) -->
             <select id="req-produtos-catalogo" class="d-none">
                 <option value=""></option>
                 {% for p in produtos %}
@@ -257,7 +271,7 @@ document.addEventListener('DOMContentLoaded', function () {
         produtoSelecionado = produto;
         input.value = produto.label;
         btnAdd.disabled = false;
-        hint.textContent = 'Estoque atual: ' + (produto.qtd || '0') + ' ' + produto.unidade;
+        hint.textContent = 'Estoque na Secretaria: ' + (produto.qtd || '0') + ' ' + produto.unidade;
     });
 
     input.addEventListener('input', function () {

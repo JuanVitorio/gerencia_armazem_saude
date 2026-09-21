@@ -66,6 +66,23 @@ def filtrar_produtos_por_usuario(user, queryset=None):
     return queryset
 
 
+def get_unidades_estoque_central():
+    """
+    Unidades que funcionam como estoque central: as do tipo Secretaria
+    (ex: "Secretaria de Saúde") que estejam ativas. Cada posto tem o seu
+    estoque próprio, mas é da Secretaria o estoque de onde os postos
+    requisitam materiais.
+    """
+    return Unidade.objects.filter(tipo=Unidade.SECRETARIA, ativa=True)
+
+
+def produtos_do_estoque_central(queryset=None):
+    """Filtra o queryset de Produto pelo(s) estoque(s) central(is) (Secretaria)."""
+    if queryset is None:
+        queryset = Produto.objects.all()
+    return queryset.filter(unidade__in=get_unidades_estoque_central())
+
+
 def filtrar_movimentacoes_por_usuario(user, queryset=None):
     """Filtra o queryset de Movimentacao pela unidade do usuário (via produto__unidade)."""
     if queryset is None:
@@ -639,21 +656,25 @@ class MovimentacaoCreateView(LoginRequiredMixin, CreateView):
 
 class RequisicaoView(LoginRequiredMixin, View):
     """
-    Tela onde o usuário de uma unidade monta uma lista de itens em falta
-    (produto + quantidade) e gera um PDF formatado para impressão, a ser
-    assinado e entregue ao responsável pelo depósito.
+    Tela onde o usuário de uma unidade (posto) monta uma lista de itens em
+    falta (produto + quantidade) e gera um PDF formatado para impressão, a
+    ser assinado e entregue ao responsável pelo depósito.
+
+    Os produtos pesquisados são sempre os do ESTOQUE CENTRAL — o estoque da
+    Secretaria de Saúde (Unidade do tipo Secretaria) — e não os da unidade
+    do usuário: o posto requisita à Secretaria aquilo que ela tem em estoque.
 
     A lista de itens é montada no cliente (JS) e chega ao POST serializada
     em JSON (ver RequisicaoForm.clean_itens_json). Aqui revalidamos cada
-    produto contra o queryset permitido para o usuário — o mesmo filtro
-    por unidade usado em toda a aplicação — para não permitir que um
-    produto de outra unidade seja injetado no PDF.
+    produto contra o estoque central — o mesmo queryset que alimenta a
+    busca — para não permitir que um produto de outra unidade seja
+    injetado no PDF.
     """
     template_name = 'estoque/requisicao_form.html'
 
     def _produtos_disponiveis(self, request):
-        return filtrar_produtos_por_usuario(
-            request.user,
+        # Independe da unidade do usuário: a busca é sempre no estoque da Secretaria.
+        return produtos_do_estoque_central(
             Produto.objects.filter(ativo=True).select_related('categoria', 'unidade'),
         ).order_by('nome')
 
@@ -663,6 +684,13 @@ class RequisicaoView(LoginRequiredMixin, View):
         if unidade_usuario is not None:
             return Unidade.objects.filter(pk=unidade_usuario.pk)
         return None
+
+    def _contexto(self, request, form, produtos):
+        return {
+            'form': form,
+            'produtos': produtos,
+            'estoque_central': list(get_unidades_estoque_central()),
+        }
 
     def get(self, request):
         unidade_usuario = get_unidade_do_usuario(request.user)
@@ -674,10 +702,9 @@ class RequisicaoView(LoginRequiredMixin, View):
             initial['unidade'] = unidade_usuario.pk
 
         form = RequisicaoForm(initial=initial, unidade_queryset=self._unidade_queryset(unidade_usuario))
-        return render(request, self.template_name, {
-            'form': form,
-            'produtos': self._produtos_disponiveis(request),
-        })
+        return render(request, self.template_name, self._contexto(
+            request, form, self._produtos_disponiveis(request),
+        ))
 
     def post(self, request):
         unidade_usuario = get_unidade_do_usuario(request.user)
@@ -694,12 +721,12 @@ class RequisicaoView(LoginRequiredMixin, View):
             for item in itens_brutos:
                 produto = produtos_map.get(item['produto_id'])
                 if produto is None:
-                    continue  # produto inválido ou fora do alcance do usuário — ignorado silenciosamente
+                    continue  # produto inválido ou fora do estoque central — ignorado silenciosamente
                 itens_finais.append({'produto': produto, 'quantidade': item['quantidade']})
 
             if not itens_finais:
                 messages.error(request, 'Nenhum item válido encontrado na lista. Adicione os itens novamente.')
-                return render(request, self.template_name, {'form': form, 'produtos': produtos_disponiveis})
+                return render(request, self.template_name, self._contexto(request, form, produtos_disponiveis))
 
             buffer = relatorios.relatorio_requisicao(
                 unidade=form.cleaned_data['unidade'],
@@ -711,7 +738,7 @@ class RequisicaoView(LoginRequiredMixin, View):
             response['Content-Disposition'] = 'inline; filename="requisicao_materiais.pdf"'
             return response
 
-        return render(request, self.template_name, {'form': form, 'produtos': produtos_disponiveis})
+        return render(request, self.template_name, self._contexto(request, form, produtos_disponiveis))
 
 
 # ---------------------------------------------------------------------------
