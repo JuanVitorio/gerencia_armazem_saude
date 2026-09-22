@@ -34,6 +34,22 @@
             </div>
             {% endif %}
 
+            {% if form.unidade %}
+            <!-- Só aparece para Administrador: escolhe de qual unidade (posto ou -->
+            <!-- Secretaria) é o estoque deste produto. Usuário comum não vê isso -->
+            <!-- porque a unidade dele é sempre a própria, atribuída automaticamente. -->
+            <div class="form-row">
+                <div class="form-col-full">
+                    <label for="{{ form.unidade.id_for_label }}" class="form-label-compact">
+                        Unidade <span class="req">*</span>
+                        <span class="form-hint">de qual unidade é o estoque deste produto</span>
+                    </label>
+                    {{ form.unidade }}
+                    {% for e in form.unidade.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Linha 1: Nome + Categoria -->
             <div class="form-row">
                 <div class="form-col-lg">

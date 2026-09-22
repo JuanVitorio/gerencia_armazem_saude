@@ -2,10 +2,35 @@
 {% load humanize %}
 {% block title %}Dashboard — Gestão de Estoque{% endblock %}
 
+{% block extra_head %}
+<style>
+    /* Ajustes locais do dashboard enxuto (sem mexer no custom.css global) */
+    .stat-mini-warning .stat-mini-value { color: var(--color-warning); }
+    .stat-mini-sub {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        margin-top: 0.2rem;
+    }
+    .dash-card-footer {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.35rem 1.25rem;
+        padding: 0.5rem 0.75rem;
+        border-top: 1px solid var(--border-color);
+        background-color: var(--bg-subtle);
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
+    .dash-card-footer a { color: var(--color-primary); text-decoration: none; }
+    .dash-card-footer a:hover { text-decoration: underline; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-container">
 
-    <!-- Cabeçalho da página -->
+    <!-- Cabeçalho da página: uma única ação principal -->
     <div class="page-header">
         <div>
             <h1 class="page-title">
@@ -21,16 +46,13 @@
             {% endif %}
         </div>
         <div class="page-actions">
-            <a href="{% url 'estoque:produto_create' %}" class="btn btn-primary btn-sm" id="btn-novo-produto">
-                <i class="bi bi-plus-lg"></i> Novo Produto
-            </a>
             <a href="{% url 'estoque:movimentacao_create' %}" class="btn btn-success btn-sm" id="btn-nova-movimentacao">
                 <i class="bi bi-arrow-down-up"></i> Registrar Movimentação
             </a>
         </div>
     </div>
 
-    <!-- Contadores rápidos -->
+    <!-- Indicadores: o que existe e o que precisa de atenção -->
     <div class="stats-row">
         <a href="{% url 'estoque:produto_list' %}" class="stat-mini">
             <span class="stat-mini-value">{{ total_produtos }}</span>
@@ -40,24 +62,22 @@
             <span class="stat-mini-value">{{ total_estoque_baixo }}</span>
             <span class="stat-mini-label"><i class="bi bi-exclamation-triangle"></i> Estoque Baixo</span>
         </a>
-        <a href="{% url 'estoque:produto_list' %}?situacao=VENCIDO" class="stat-mini {% if total_vencidos > 0 %}stat-mini-danger{% endif %}">
-            <span class="stat-mini-value">{{ total_vencidos }}</span>
-            <span class="stat-mini-label"><i class="bi bi-calendar-x"></i> Vencidos</span>
-        </a>
-        <a href="{% url 'estoque:movimentacao_list' %}" class="stat-mini">
-            <span class="stat-mini-value">{{ ultimas_movimentacoes|length }}</span>
-            <span class="stat-mini-label"><i class="bi bi-clock-history"></i> Recentes</span>
+        <a href="{% url 'estoque:produto_list' %}?situacao={% if total_vencidos > 0 %}VENCIDO{% else %}VENCENDO{% endif %}"
+           class="stat-mini {% if total_vencidos > 0 %}stat-mini-danger{% elif total_a_vencer > 0 %}stat-mini-warning{% endif %}">
+            <span class="stat-mini-value">{{ total_validade }}</span>
+            <span class="stat-mini-label"><i class="bi bi-calendar-x"></i> Validade</span>
+            <span class="stat-mini-sub">{{ total_vencidos }} vencido{{ total_vencidos|pluralize }} · {{ total_a_vencer }} a vencer em {{ dias_alerta_vencimento }} dias</span>
         </a>
     </div>
 
-    <!-- Grid principal -->
+    <!-- Grid principal: listas curtas (5 itens) com link para o restante -->
     <div class="dashboard-grid">
 
-        <!-- Coluna 1: Estoque Baixo -->
+        <!-- Estoque Baixo -->
         <div class="dash-card">
             <div class="dash-card-header dash-card-danger">
                 <span><i class="bi bi-exclamation-diamond-fill"></i> Estoque Baixo</span>
-                <span class="dash-badge dash-badge-danger">{{ produtos_estoque_baixo|length }}</span>
+                <span class="dash-badge dash-badge-danger">{{ total_estoque_baixo }}</span>
             </div>
             {% if produtos_estoque_baixo %}
             <div class="dash-table-wrap">
@@ -77,6 +97,11 @@
                     </tbody>
                 </table>
             </div>
+            {% if total_estoque_baixo > produtos_estoque_baixo|length %}
+            <div class="dash-card-footer">
+                <a href="{% url 'estoque:produto_list' %}?situacao=BAIXO">Ver todos ({{ total_estoque_baixo }})</a>
+            </div>
+            {% endif %}
             {% else %}
             <div class="dash-empty">
                 <i class="bi bi-check-circle text-success"></i>
@@ -85,11 +110,11 @@
             {% endif %}
         </div>
 
-        <!-- Coluna 2: Validade -->
+        <!-- Validade (vencidos primeiro, depois os que vencem em breve) -->
         <div class="dash-card">
             <div class="dash-card-header dash-card-warning">
                 <span><i class="bi bi-calendar-event-fill"></i> Validade</span>
-                <span class="dash-badge dash-badge-warning">{{ produtos_validade|length }}</span>
+                <span class="dash-badge dash-badge-warning">{{ total_validade }}</span>
             </div>
             {% if produtos_validade %}
             <div class="dash-table-wrap">
@@ -99,7 +124,8 @@
                     <tr>
                         <td>
                             <a href="{{ p.get_absolute_url }}" class="item-link">{{ p.nome }}</a>
-                            {% if p.unidade %}
+                            {# A unidade só aparece para o admin: para quem é de um posto seria sempre a mesma #}
+                            {% if not unidade_atual and p.unidade %}
                                 <span class="cat-tag"><i class="bi bi-building"></i> {% if p.unidade.codigo %}{{ p.unidade.codigo }} — {% endif %}{{ p.unidade.nome }}</span>
                             {% endif %}
                             {% if p.vencido %}
@@ -114,6 +140,16 @@
                     </tbody>
                 </table>
             </div>
+            {% if total_validade > produtos_validade|length %}
+            <div class="dash-card-footer">
+                {% if total_vencidos > 0 %}
+                <a href="{% url 'estoque:produto_list' %}?situacao=VENCIDO">Ver vencidos ({{ total_vencidos }})</a>
+                {% endif %}
+                {% if total_a_vencer > 0 %}
+                <a href="{% url 'estoque:produto_list' %}?situacao=VENCENDO">Ver a vencer ({{ total_a_vencer }})</a>
+                {% endif %}
+            </div>
+            {% endif %}
             {% else %}
             <div class="dash-empty">
                 <i class="bi bi-calendar-check text-success"></i>
@@ -122,13 +158,11 @@
             {% endif %}
         </div>
 
-        <!-- Coluna 3: Últimas Movimentações -->
+        <!-- Últimas movimentações (bloco discreto) -->
         <div class="dash-card">
             <div class="dash-card-header dash-card-primary">
                 <span><i class="bi bi-clock-history"></i> Últimas Movimentações</span>
-                <a href="{% url 'estoque:movimentacao_create' %}" class="dash-btn-sm" id="btn-nova-mov-dash">
-                    <i class="bi bi-plus-lg"></i> Nova
-                </a>
+                <a href="{% url 'estoque:movimentacao_list' %}" class="dash-btn-sm">Ver todas</a>
             </div>
             {% if ultimas_movimentacoes %}
             <div class="dash-table-wrap">
@@ -161,26 +195,6 @@
         </div>
 
     </div><!-- /dashboard-grid -->
-
-    <!-- Atalhos rápidos -->
-    <div class="quick-actions">
-        <a href="{% url 'estoque:produto_create' %}" class="quick-action-btn" id="atalho-cadastrar">
-            <i class="bi bi-plus-circle"></i>
-            <span>Cadastrar Produto</span>
-        </a>
-        <a href="{% url 'estoque:produto_list' %}" class="quick-action-btn" id="atalho-estoque">
-            <i class="bi bi-search"></i>
-            <span>Consultar Estoque</span>
-        </a>
-        <a href="{% url 'estoque:movimentacao_create' %}" class="quick-action-btn" id="atalho-entrada">
-            <i class="bi bi-arrow-down-left-circle"></i>
-            <span>Registrar Entrada</span>
-        </a>
-        <a href="{% url 'estoque:relatorio_list' %}" class="quick-action-btn" id="atalho-relatorio">
-            <i class="bi bi-file-earmark-pdf"></i>
-            <span>Relatórios</span>
-        </a>
-    </div>
 
 </div>
 {% endblock %}
