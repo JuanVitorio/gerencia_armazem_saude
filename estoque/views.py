@@ -138,6 +138,10 @@ def aplicar_filtro_produtos(queryset, filtro_form):
 # Dashboard
 # ---------------------------------------------------------------------------
 
+# Quantidade de linhas exibidas em cada lista do dashboard.
+ITENS_DASHBOARD = 5
+
+
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'estoque/dashboard.html'
 
@@ -169,10 +173,21 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         produtos_com_estoque_baixo = [p for p in produtos if p.estoque_baixo]
         produtos_com_estoque_baixo.sort(key=lambda p: p.quantidade)
 
+        # Validade: já vencidos + os que vencem dentro do prazo de alerta.
+        # Ordenado por data, então os vencidos aparecem primeiro na lista.
         validade_alerta = produtos.filter(
             data_validade__isnull=False,
             data_validade__lte=limite_validade,
         ).order_by('data_validade')
+        total_vencidos = produtos.filter(
+            data_validade__isnull=False,
+            data_validade__lt=hoje,
+        ).count()
+        total_a_vencer = produtos.filter(
+            data_validade__isnull=False,
+            data_validade__gte=hoje,
+            data_validade__lte=limite_validade,
+        ).count()
 
         # Movimentações filtradas pela unidade do usuário
         movs_qs = Movimentacao.objects.select_related('produto', 'usuario')
@@ -180,16 +195,19 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         if unidade is not None:
             movs_qs = movs_qs.filter(produto__unidade=unidade)
 
+        # Dashboard enxuto: listas curtas (ITENS_DASHBOARD) e totais REAIS nos
+        # contadores/selos — as listas são cortadas, mas os totais não, com
+        # link "Ver todos" para a lista filtrada completa.
         context.update({
             'total_produtos': produtos.count(),
             'total_estoque_baixo': len(produtos_com_estoque_baixo),
-            'total_vencidos': produtos.filter(
-                data_validade__isnull=False,
-                data_validade__lt=hoje,
-            ).count(),
-            'produtos_estoque_baixo': produtos_com_estoque_baixo[:10],
-            'produtos_validade': validade_alerta[:10],
-            'ultimas_movimentacoes': movs_qs[:10],
+            'total_vencidos': total_vencidos,
+            'total_a_vencer': total_a_vencer,
+            'total_validade': total_vencidos + total_a_vencer,
+            'dias_alerta_vencimento': settings.DIAS_ALERTA_VENCIMENTO,
+            'produtos_estoque_baixo': produtos_com_estoque_baixo[:ITENS_DASHBOARD],
+            'produtos_validade': validade_alerta[:ITENS_DASHBOARD],
+            'ultimas_movimentacoes': movs_qs[:ITENS_DASHBOARD],
             'unidade_atual': unidade,
         })
         return context
@@ -420,9 +438,20 @@ class ProdutoCreateView(LoginRequiredMixin, View):
     def _get_unidade(self):
         return get_unidade_do_usuario(self.request.user)
 
+    def _unidade_queryset_para_form(self):
+        # Só o Administrador vê o campo "Unidade" no formulário: usuário
+        # comum tem a unidade atribuída automaticamente (a dele própria).
+        # Sem isso, um produto cadastrado pelo admin ficava com
+        # unidade=None e nunca aparecia em pesquisa alguma — incluindo a
+        # da Requisição, que busca no estoque da Secretaria (Unidade
+        # administrativa) e depende do produto estar de fato vinculado a ela.
+        if self._get_unidade() is None:
+            return Unidade.objects.filter(ativa=True).order_by('tipo', 'nome')
+        return None
+
     def get(self, request, *args, **kwargs):
         from django.shortcuts import render
-        form = ProdutoForm()
+        form = ProdutoForm(unidade_queryset=self._unidade_queryset_para_form())
         return render(request, self.template_name, {
             'form': form,
             'modo_rapido': True,
@@ -431,12 +460,15 @@ class ProdutoCreateView(LoginRequiredMixin, View):
 
     def post(self, request, *args, **kwargs):
         from django.shortcuts import render
-        form = ProdutoForm(request.POST)
+        form = ProdutoForm(request.POST, unidade_queryset=self._unidade_queryset_para_form())
         if form.is_valid():
             produto = form.save(commit=False)
             unidade = self._get_unidade()
             if unidade:
                 produto.unidade = unidade
+            else:
+                # Admin: a unidade escolhida no campo extra do form.
+                produto.unidade = form.cleaned_data['unidade']
             produto.save()
             messages.success(request, f'✓ "{produto.nome}" cadastrado. Próximo produto:')
             # Redireciona para GET (PRG pattern) para limpar o form
@@ -459,9 +491,28 @@ class ProdutoUpdateView(LoginRequiredMixin, UpdateView):
     def get_success_url(self):
         return self.object.get_absolute_url()
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        # Admin também pode editar a unidade aqui — é a forma de corrigir,
+        # pela própria tela, um produto que ficou sem unidade (unidade=None)
+        # por ter sido cadastrado antes dessa correção.
+        if get_unidade_do_usuario(self.request.user) is None:
+            kwargs['unidade_queryset'] = Unidade.objects.filter(ativa=True).order_by('tipo', 'nome')
+        return kwargs
+
+    def get_initial(self):
+        initial = super().get_initial()
+        if self.object.unidade_id:
+            initial['unidade'] = self.object.unidade_id
+        return initial
+
     def form_valid(self, form):
+        self.object = form.save(commit=False)
+        if 'unidade' in form.cleaned_data:
+            self.object.unidade = form.cleaned_data['unidade']
+        self.object.save()
         messages.success(self.request, 'Produto atualizado com sucesso.')
-        return super().form_valid(form)
+        return redirect(self.get_success_url())
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

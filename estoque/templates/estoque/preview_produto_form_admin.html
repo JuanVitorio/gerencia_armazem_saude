@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Novo Produto — Gestão de Estoque</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<style>''' + css + '''</style>
+
+</head>
+<body>
+<nav class="navbar navbar-custom sticky-top"><div class="container-fluid px-3">
+  <a class="navbar-brand" href="#"><i class="bi bi-box-seam-fill"></i> <span class="d-none d-sm-inline">Gestão de Estoque</span></a>
+  <div class="nav-links d-none d-lg-flex align-items-center gap-1">
+    <a class="nav-link active" href="#"><i class="bi bi-speedometer2"></i> Dashboard</a>
+    <a class="nav-link" href="#"><i class="bi bi-box-seam"></i> Produtos</a>
+    <a class="nav-link" href="#"><i class="bi bi-arrow-down-up"></i> Movimentações</a>
+    <a class="nav-link" href="#"><i class="bi bi-clipboard2-check"></i> Requisição</a>
+    <a class="nav-link" href="#"><i class="bi bi-file-earmark-bar-graph"></i> Relatórios</a>
+    
+    <div class="nav-separator"></div>
+    <a class="nav-link nav-link-admin" href="#"><i class="bi bi-building"></i> Unidades</a>
+    <a class="nav-link nav-link-admin" href="#"><i class="bi bi-people"></i> Usuários</a>
+    <a class="nav-link nav-link-admin" href="#"><i class="bi bi-calendar-heart"></i> Dias de Folga</a>
+    
+  </div>
+  <div class="d-flex align-items-center gap-2">
+    <span class="unidade-badge admin-badge d-none d-md-inline-flex"><i class="bi bi-shield-check"></i> Administrador</span>
+    
+    <button class="user-btn" type="button"><i class="bi bi-person-circle"></i> <span class="d-none d-sm-inline">Maria Souza</span></button>
+  </div>
+</div></nav>
+<main class="main-content">
+<div class="page-container">
+
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">
+                <i class="bi bi-plus-circle text-primary"></i>
+                Novo Produto
+            </h1>
+            
+            <p class="page-subtitle">
+                <i class="bi bi-lightning-charge text-warning"></i>
+                Cadastro rápido — após salvar, o formulário é limpo automaticamente para o próximo item.
+            </p>
+            
+        </div>
+        <a href="#produto_list" class="btn btn-outline-secondary btn-sm" id="btn-voltar-lista">
+            <i class="bi bi-arrow-left"></i> Voltar à Lista
+        </a>
+    </div>
+
+    <div class="form-card">
+        <form method="post" novalidate id="form-produto">
+            
+
+            
+
+            
+            <!-- Só aparece para Administrador: escolhe de qual unidade (posto ou -->
+            <!-- Secretaria) é o estoque deste produto. Usuário comum não vê isso -->
+            <!-- porque a unidade dele é sempre a própria, atribuída automaticamente. -->
+            <div class="form-row">
+                <div class="form-col-full">
+                    <label for="id_unidade" class="form-label-compact">
+                        Unidade <span class="req">*</span>
+                        <span class="form-hint">de qual unidade é o estoque deste produto</span>
+                    </label>
+                    <select id="id_unidade" class="form-control"><option value="">---------</option><option value="1" selected>Secretaria — Secretaria de Saúde</option><option value="2">Posto de Saúde — UBS Centro</option><option value="3">Posto de Saúde — UBS Norte</option></select>
+                    
+                </div>
+            </div>
+            
+
+            <!-- Linha 1: Nome + Categoria -->
+            <div class="form-row">
+                <div class="form-col-lg">
+                    <label for="id_x" class="form-label-compact">
+                        Nome <span class="req">*</span>
+                    </label>
+                    <input class="form-control" value="Dipirona 500mg">
+                    
+                </div>
+                <div class="form-col-sm">
+                    <label for="id_x" class="form-label-compact">
+                        Categoria <span class="req">*</span>
+                    </label>
+                    <select id="id_categoria" class="form-control"><option data-tipo="MEDICAMENTO" selected>Medicamentos</option><option data-tipo="VACINA">Vacinas</option></select>
+                    
+                </div>
+            </div>
+
+            <!-- Linha 2: Detalhes -->
+            <div class="form-row" id="campo-detalhes">
+                <div class="form-col-full">
+                    <label for="id_x" class="form-label-compact">
+                        Detalhes <span class="form-hint">cor, tamanho, concentração, modelo...</span>
+                    </label>
+                    <input class="form-control" value="500mg/5ml">
+                    
+                </div>
+            </div>
+
+            <!-- Linha 3: Quantidade + Unidade de medida -->
+            <div class="form-row">
+                <div class="form-col-sm">
+                    <label for="id_x" class="form-label-compact">
+                        Quantidade <span class="req">*</span>
+                    </label>
+                    <input type="number" class="form-control" value="0">
+                    
+                </div>
+                <div class="form-col-sm">
+                    <label for="id_x" class="form-label-compact">
+                        Unidade de Medida <span class="req">*</span>
+                    </label>
+                    <select class="form-control"><option>Caixa</option></select>
+                    
+                </div>
+                <!-- Campos condicionais: Lote + Validade (rastreabilidade) -->
+                <div class="form-col-sm" id="campo-lote" style="display:none;">
+                    <label for="id_x" class="form-label-compact">Lote</label>
+                    <input class="form-control">
+                    
+                </div>
+                <div class="form-col-sm" id="campo-data_validade">
+                    <label for="id_x" class="form-label-compact">
+                        Data de Validade <span class="form-hint">opcional — vacinas, medicamentos etc.</span>
+                    </label>
+                    <input type="date" class="form-control">
+                    
+                </div>
+            </div>
+
+            <!-- Campo condicional: Código/SKU (apenas para categorias que usam SKU) -->
+            <div class="form-row" id="campo-sku" style="display:none;">
+                <div class="form-col-sm">
+                    <label for="id_x" class="form-label-compact">
+                        Código / SKU <span class="form-hint">opcional</span>
+                    </label>
+                    <input class="form-control">
+                    
+                </div>
+            </div>
+
+            <!-- Descrição/Observações (colapsável) -->
+            <div class="form-row">
+                <div class="form-col-full">
+                    <details open>
+                        <summary class="form-label-compact" style="cursor:pointer; user-select:none;">
+                            <i class="bi bi-chevron-right toggle-icon"></i>
+                            Observações adicionais <span class="form-hint">(opcional)</span>
+                        </summary>
+                        <div style="margin-top: 0.5rem;">
+                            <textarea class="form-control" rows="2"></textarea>
+                        </div>
+                    </details>
+                </div>
+            </div>
+
+            <!-- Ações -->
+            <div class="form-actions">
+                
+                <button type="submit" class="btn btn-primary" id="btn-salvar-produto">
+                    <i class="bi bi-check-circle-fill"></i> Salvar e Cadastrar Próximo
+                </button>
+                
+                <a href="#produto_list" class="btn btn-outline-secondary">Cancelar</a>
+            </div>
+
+        </form>
+    </div>
+</div>
+</main>
+<div style="position:fixed;bottom:10px;right:12px;background:#111827;color:#fff;font:600 12px system-ui;padding:6px 10px;border-radius:8px;opacity:.85">DEPOIS — Admin (agora escolhe a Unidade)</div>
+</body></html>

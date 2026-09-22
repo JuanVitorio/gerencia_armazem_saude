@@ -88,6 +88,28 @@ class ProdutoForm(BaseFormMixin, forms.ModelForm):
             'sku': 'Código interno ou de referência.',
         }
 
+    def __init__(self, *args, unidade_queryset=None, **kwargs):
+        """
+        unidade_queryset só é passado pela view quando quem está logado é
+        Administrador (sem unidade própria). Nesse caso, o form ganha um
+        campo extra 'unidade' — do contrário, o produto ficava com
+        unidade=None (não pertencendo a unidade nenhuma) e nunca aparecia
+        em nenhuma pesquisa por estoque, nem a da própria Requisição.
+        Usuário comum não vê esse campo: a unidade dele é atribuída
+        automaticamente pela view, como já era.
+        """
+        super().__init__(*args, **kwargs)
+        if unidade_queryset is not None:
+            self.fields['unidade'] = forms.ModelChoiceField(
+                queryset=unidade_queryset,
+                label='Unidade',
+                required=True,
+                help_text='De qual unidade (posto ou Secretaria) é o estoque deste produto.',
+            )
+            self.fields['unidade'].widget.attrs['class'] = 'form-control'
+            if self.initial.get('unidade'):
+                self.fields['unidade'].initial = self.initial['unidade']
+
 
 class MovimentacaoForm(BaseFormMixin, forms.ModelForm):
     class Meta:
