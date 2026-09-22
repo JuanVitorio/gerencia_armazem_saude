@@ -13,6 +13,15 @@
  * ---------------------------------------------------------------------
  */
 
+// Remove acentuação (á, ã, ç...) e caixa, para a busca ignorar os dois —
+// ex: "agua" encontra "Água", "SECRETARIA" encontra "secretaria".
+function normalizarBuscaProduto(str) {
+    if (!str) {
+        return '';
+    }
+    return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
 function attachProdutoBusca(sourceSelectEl, inputEl, dropdownEl, onSelect) {
     if (!sourceSelectEl || !inputEl || !dropdownEl) {
         return;
@@ -96,16 +105,16 @@ function attachProdutoBusca(sourceSelectEl, inputEl, dropdownEl, onSelect) {
     }
 
     function filtrar(termoBruto) {
-        var termo = termoBruto.trim().toLowerCase();
+        var termo = normalizarBuscaProduto(termoBruto.trim());
         if (!termo) {
             esconderDropdown();
             return;
         }
         var filtrados = produtos.filter(function (p) {
             return (
-                p.label.toLowerCase().indexOf(termo) !== -1 ||
-                p.sku.toLowerCase().indexOf(termo) !== -1 ||
-                p.detalhes.toLowerCase().indexOf(termo) !== -1
+                normalizarBuscaProduto(p.label).indexOf(termo) !== -1 ||
+                normalizarBuscaProduto(p.sku).indexOf(termo) !== -1 ||
+                normalizarBuscaProduto(p.detalhes).indexOf(termo) !== -1
             );
         }).slice(0, 8);
         renderDropdown(filtrados);

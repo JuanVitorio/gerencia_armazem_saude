@@ -1,3 +1,4 @@
+import unicodedata
 from datetime import datetime, timedelta
 
 from django.conf import settings
@@ -95,43 +96,70 @@ def filtrar_movimentacoes_por_usuario(user, queryset=None):
     return queryset
 
 
+def normalizar_busca(texto):
+    """
+    Remove acentuação (á, ã, ç, ...) e caixa (maiúsculo/minúsculo) de um
+    texto, para comparações de busca "tolerantes" — usado por toda busca
+    de produto no sistema (filtro da lista, busca ao vivo via AJAX e a
+    busca de produto em Requisição/Movimentação, ver produto-busca.js).
+    O icontains do banco já ignora caixa, mas não acentuação — por isso
+    a comparação é feita em Python, e não direto na query.
+    """
+    if not texto:
+        return ''
+    texto = unicodedata.normalize('NFKD', texto)
+    texto = ''.join(c for c in texto if not unicodedata.combining(c))
+    return texto.casefold()
+
+
 def aplicar_filtro_produtos(queryset, filtro_form):
     """
     Aplica os filtros de busca/categoria/situação de um ProdutoFiltroForm
     válido a um queryset de Produto. Compartilhado entre ProdutoListView e
     UnidadeDetailView (pesquisa de estoque dentro de uma unidade).
+
+    Sempre retorna uma lista (e não mais um QuerySet): a busca por termo
+    ignora acentuação, o que exige comparar em Python (ver
+    normalizar_busca), e a regra de estoque baixo já dependia disso.
+    Quem chamar esta função e precisar de ordenação deve ordenar o
+    queryset ANTES de passá-lo pra cá (List preserva a ordem recebida).
     """
     if not filtro_form.is_valid():
-        return queryset
+        return list(queryset)
     termo = filtro_form.cleaned_data.get('q')
     categoria = filtro_form.cleaned_data.get('categoria')
     situacao = filtro_form.cleaned_data.get('situacao')
-    if termo:
-        queryset = queryset.filter(
-            Q(nome__icontains=termo) | Q(sku__icontains=termo) |
-            Q(lote__icontains=termo) | Q(detalhes__icontains=termo) |
-            Q(categoria__nome__icontains=termo)
-        )
+
     if categoria:
         queryset = queryset.filter(categoria=categoria)
+
+    produtos = list(queryset)
+
+    if termo:
+        termo_norm = normalizar_busca(termo)
+        produtos = [
+            p for p in produtos
+            if termo_norm in normalizar_busca(p.nome)
+            or termo_norm in normalizar_busca(p.sku)
+            or termo_norm in normalizar_busca(p.lote)
+            or termo_norm in normalizar_busca(p.detalhes)
+            or (p.categoria_id and termo_norm in normalizar_busca(p.categoria.nome))
+        ]
+
     hoje = timezone.localdate()
     if situacao == 'BAIXO':
         # Mesma regra dinâmica/parametrizável do dashboard (ver
         # Produto.limite_estoque_baixo_calculado em models.py) — precisa ser
         # avaliada em Python porque o limite pode variar por produto/
-        # categoria/percentual, então não dá pra fazer com um único
-        # `.filter()` no banco. Mantido consistente de propósito: é para
+        # categoria/percentual. Mantido consistente de propósito: é para
         # onde o contador "Estoque Baixo" do dashboard linka.
-        queryset = [p for p in queryset if p.estoque_baixo]
+        produtos = [p for p in produtos if p.estoque_baixo]
     elif situacao == 'VENCIDO':
-        queryset = queryset.filter(data_validade__isnull=False, data_validade__lt=hoje)
+        produtos = [p for p in produtos if p.data_validade and p.data_validade < hoje]
     elif situacao == 'VENCENDO':
-        queryset = queryset.filter(
-            data_validade__isnull=False,
-            data_validade__gte=hoje,
-            data_validade__lte=hoje + timedelta(days=settings.DIAS_ALERTA_VENCIMENTO),
-        )
-    return queryset
+        limite = hoje + timedelta(days=settings.DIAS_ALERTA_VENCIMENTO)
+        produtos = [p for p in produtos if p.data_validade and hoje <= p.data_validade <= limite]
+    return produtos
 
 
 # ---------------------------------------------------------------------------
@@ -240,9 +268,11 @@ class UnidadeDetailView(LoginRequiredMixin, AdminRequiredMixin, DetailView):
 
         # Estoque da unidade, pesquisável (mesmo ProdutoFiltroForm da tela de Produtos)
         # — é a tela que o admin usa pra checar rapidamente "tem vacina no Posto A?".
-        produtos_qs = self.object.produtos.filter(ativo=True).select_related('categoria')
+        # Ordena a queryset ANTES do filtro: aplicar_filtro_produtos devolve
+        # uma lista (não dá pra encadear .order_by() depois — ver docstring).
+        produtos_qs = self.object.produtos.filter(ativo=True).select_related('categoria').order_by('nome')
         self.filtro_form = ProdutoFiltroForm(self.request.GET or None)
-        produtos_qs = aplicar_filtro_produtos(produtos_qs, self.filtro_form).order_by('nome')
+        produtos_qs = aplicar_filtro_produtos(produtos_qs, self.filtro_form)
 
         paginator = Paginator(produtos_qs, self.paginate_by)
         page_obj = paginator.get_page(self.request.GET.get('page'))
@@ -382,15 +412,21 @@ class ProdutoBuscaAjaxView(LoginRequiredMixin, View):
         if unidade_atual:
             qs = qs.filter(unidade=unidade_atual)
 
-        if termo:
-            qs = qs.filter(
-                Q(nome__icontains=termo) | 
-                Q(sku__icontains=termo) | 
-                Q(detalhes__icontains=termo)
-            )
-
         if categoria_id:
             qs = qs.filter(categoria_id=categoria_id)
+
+        qs = list(qs)
+
+        if termo:
+            # Busca tolerante a acento/caixa (ver normalizar_busca) — o
+            # icontains do banco só ignora caixa, não acentuação.
+            termo_norm = normalizar_busca(termo)
+            qs = [
+                p for p in qs
+                if termo_norm in normalizar_busca(p.nome)
+                or termo_norm in normalizar_busca(p.sku)
+                or termo_norm in normalizar_busca(p.detalhes)
+            ]
 
         # Regras de situação (Ajuste os filtros conforme suas propriedades no model)
         # ex: 'vencido', 'baixo'
@@ -784,6 +820,7 @@ class RequisicaoView(LoginRequiredMixin, View):
                 solicitante=form.cleaned_data['solicitante'],
                 data_solicitacao=form.cleaned_data['data_solicitacao'],
                 itens=itens_finais,
+                titulo=form.cleaned_data.get('titulo'),
             )
             response = HttpResponse(buffer, content_type='application/pdf')
             response['Content-Disposition'] = 'inline; filename="requisicao_materiais.pdf"'

@@ -327,6 +327,11 @@ class RequisicaoForm(BaseFormMixin, forms.Form):
     data_solicitacao = forms.DateField(
         label='Data', widget=forms.DateInput(attrs={'type': 'date'}),
     )
+    titulo = forms.CharField(
+        label='Título da Lista', max_length=100, required=False,
+        widget=forms.TextInput(attrs={'placeholder': 'Ex: Insumos, Produtos de limpeza... (opcional)'}),
+        help_text='Opcional. Em branco, o PDF usa o título genérico "Requisição de Materiais".',
+    )
     itens_json = forms.CharField(widget=forms.HiddenInput())
 
     def __init__(self, *args, unidade_queryset=None, **kwargs):
