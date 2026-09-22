@@ -1,6 +1,30 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 
 from .models import Categoria, EventoFolga, Funcionario, LancamentoFolga, Movimentacao, PerfilUsuario, Produto, Unidade
+
+
+class SemUnidadeFilter(admin.SimpleListFilter):
+    """
+    Filtro para achar de uma vez os produtos que ficaram com unidade=None
+    (cadastrados por um Administrador antes do formulário ganhar o campo
+    Unidade) — esses produtos não aparecem em nenhuma pesquisa por
+    estoque, incluindo a da Requisição.
+    """
+    title = 'possui unidade'
+    parameter_name = 'possui_unidade'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('nao', 'Sem unidade (não aparece em nenhuma pesquisa)'),
+            ('sim', 'Com unidade'),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == 'nao':
+            return queryset.filter(unidade__isnull=True)
+        if self.value() == 'sim':
+            return queryset.filter(unidade__isnull=False)
+        return queryset
 
 
 @admin.register(Categoria)
@@ -31,9 +55,14 @@ class ProdutoAdmin(admin.ModelAdmin):
         'nome', 'unidade', 'categoria', 'quantidade', 'unidade_medida',
         'limite_estoque_baixo_calculado', 'data_validade', 'ativo',
     )
-    list_filter = ('categoria', 'unidade', 'ativo')
+    list_filter = ('categoria', 'unidade', SemUnidadeFilter, 'ativo')
     search_fields = ('nome', 'sku', 'lote', 'detalhes')
     autocomplete_fields = ('categoria', 'unidade')
+    actions = ['atribuir_ao_estoque_central']
+    # Com todos os produtos numa página só, "Selecionar todos os N produtos"
+    # (link que aparece após marcar o checkbox do cabeçalho) já pega todos
+    # de uma vez, sem precisar passar de página.
+    list_per_page = 200
     fieldsets = (
         (None, {
             'fields': (
@@ -55,6 +84,27 @@ class ProdutoAdmin(admin.ModelAdmin):
     @admin.display(description='Limite Baixo (calculado)')
     def limite_estoque_baixo_calculado(self, obj):
         return obj.limite_estoque_baixo_calculado
+
+    @admin.action(description='Atribuir ao estoque central (Secretaria) os produtos selecionados')
+    def atribuir_ao_estoque_central(self, request, queryset):
+        centrais = Unidade.objects.filter(tipo=Unidade.SECRETARIA, ativa=True)
+        total_centrais = centrais.count()
+        if total_centrais != 1:
+            self.message_user(
+                request,
+                f'Encontrei {total_centrais} unidade(s) do tipo Secretaria ativa(s) — a atribuição em massa '
+                'só funciona quando existe exatamente uma. Ajuste em Unidades (deixe só a Secretaria correta '
+                'como ativa) e tente de novo, ou escolha a unidade manualmente em cada produto.',
+                level=messages.ERROR,
+            )
+            return
+        central = centrais.first()
+        atualizados = queryset.update(unidade=central)
+        self.message_user(
+            request,
+            f'{atualizados} produto(s) atribuído(s) a "{central}".',
+            level=messages.SUCCESS,
+        )
 
 
 @admin.register(Movimentacao)
