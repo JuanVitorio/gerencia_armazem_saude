@@ -57,7 +57,10 @@
 
     <!-- O formulário inteiro (cabeçalho + itens) é enviado de uma vez; o botão
          "Adicionar à Lista" é type="button" e não submete a página. -->
-    <form method="post" id="form-requisicao" target="_blank" novalidate>
+    <!-- Sem target="_blank": a resposta vem como download (attachment), então o
+         navegador baixa o arquivo sem navegar pra outra aba/página — a lista
+         de itens preenchida continua na tela depois de gerar o PDF. -->
+    <form method="post" id="form-requisicao" novalidate>
         {% csrf_token %}
         {{ form.itens_json }}
 

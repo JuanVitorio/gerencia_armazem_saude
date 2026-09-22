@@ -13,6 +13,7 @@ from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
+from django.utils.text import slugify
 from django.views.generic import (
     CreateView, DeleteView, DetailView, ListView,
     TemplateView, UpdateView, View,
@@ -815,15 +816,25 @@ class RequisicaoView(LoginRequiredMixin, View):
                 messages.error(request, 'Nenhum item válido encontrado na lista. Adicione os itens novamente.')
                 return render(request, self.template_name, self._contexto(request, form, produtos_disponiveis))
 
+            titulo = form.cleaned_data.get('titulo')
             buffer = relatorios.relatorio_requisicao(
                 unidade=form.cleaned_data['unidade'],
                 solicitante=form.cleaned_data['solicitante'],
                 data_solicitacao=form.cleaned_data['data_solicitacao'],
                 itens=itens_finais,
-                titulo=form.cleaned_data.get('titulo'),
+                titulo=titulo,
             )
+            # Nome do arquivo usa o título (se preenchido) + a data, ex:
+            # "requisicao_produtos_de_limpeza_22-09-2026.pdf". Sem título,
+            # cai no genérico "requisicao_materiais_22-09-2026.pdf".
+            slug_titulo = slugify(titulo) if titulo else 'materiais'
+            data_str = form.cleaned_data['data_solicitacao'].strftime('%d-%m-%Y')
+            nome_arquivo = f'requisicao_{slug_titulo}_{data_str}.pdf'
+
             response = HttpResponse(buffer, content_type='application/pdf')
-            response['Content-Disposition'] = 'inline; filename="requisicao_materiais.pdf"'
+            # attachment (em vez de inline): dispara o download automático
+            # ao gerar, em vez de abrir o PDF numa aba do navegador.
+            response['Content-Disposition'] = f'attachment; filename="{nome_arquivo}"'
             return response
 
         return render(request, self.template_name, self._contexto(request, form, produtos_disponiveis))
