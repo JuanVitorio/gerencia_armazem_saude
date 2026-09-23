@@ -2,43 +2,246 @@
 {% block title %}Entrar no Sistema — Gestão de Estoque{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center my-5">
-    <div class="col-md-5 col-lg-4">
-        <div class="card-custom shadow-md">
-            <div class="card-custom-header bg-primary text-white text-center py-4">
-                <i class="bi bi-box-seam-fill display-4 mb-2 d-block"></i>
-                <h1 class="h3 text-white mb-0">Gestão de Estoque</h1>
-                <span class="fs-6 opacity-75">Armazém & Saúde</span>
+<style>
+    .login-wrapper {
+        min-height: 80vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem 1rem;
+    }
+
+    .login-card {
+        display: flex;
+        width: 100%;
+        max-width: 920px;
+        min-height: 560px;
+        border-radius: 28px;
+        overflow: hidden;
+        box-shadow: 0 20px 60px rgba(74, 144, 226, 0.18);
+        background: #ffffff;
+    }
+
+    .login-side {
+        flex: 1;
+        background: linear-gradient(160deg, #7fb3f2 0%, #5b93e0 55%, #4a7fd6 100%);
+        color: #ffffff;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 3rem 2rem;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .login-side::before {
+        content: "";
+        position: absolute;
+        width: 320px;
+        height: 320px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.08);
+        top: -80px;
+        right: -80px;
+    }
+
+    .login-side::after {
+        content: "";
+        position: absolute;
+        width: 220px;
+        height: 220px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.07);
+        bottom: -60px;
+        left: -60px;
+    }
+
+    .login-side-icon {
+        width: 96px;
+        height: 96px;
+        border-radius: 24px;
+        background: rgba(255, 255, 255, 0.18);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 1.5rem;
+        backdrop-filter: blur(6px);
+        position: relative;
+        z-index: 1;
+    }
+
+    .login-side-icon i {
+        font-size: 2.75rem;
+        color: #ffffff;
+    }
+
+    .login-side h1 {
+        font-size: 1.6rem;
+        font-weight: 700;
+        margin-bottom: 0.4rem;
+        position: relative;
+        z-index: 1;
+    }
+
+    .login-side p {
+        font-size: 1rem;
+        opacity: 0.9;
+        max-width: 260px;
+        margin: 0;
+        position: relative;
+        z-index: 1;
+    }
+
+    .login-form-side {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 3rem 3rem;
+        background: #ffffff;
+    }
+
+    .login-form-side h2 {
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: #2b3a4a;
+        margin-bottom: 0.35rem;
+    }
+
+    .login-form-side .subtitle {
+        color: #8a97a5;
+        font-size: 0.95rem;
+        margin-bottom: 2rem;
+    }
+
+    .login-field {
+        margin-bottom: 1.25rem;
+    }
+
+    .login-field label {
+        display: block;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #4a7fd6;
+        margin-bottom: 0.4rem;
+        letter-spacing: 0.02em;
+    }
+
+    .login-field input,
+    .login-field select,
+    .login-field textarea {
+        width: 100%;
+        border: 1px solid #dbe6f5;
+        background: #f5f8fd;
+        border-radius: 14px;
+        padding: 0.85rem 1.1rem;
+        font-size: 1rem;
+        color: #2b3a4a;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .login-field input:focus,
+    .login-field select:focus,
+    .login-field textarea:focus {
+        outline: none;
+        border-color: #7fb3f2;
+        box-shadow: 0 0 0 4px rgba(127, 179, 242, 0.18);
+        background: #ffffff;
+    }
+
+    .login-error {
+        color: #e35d6a;
+        font-size: 0.8rem;
+        font-weight: 600;
+        margin-top: 0.35rem;
+    }
+
+    .login-alert {
+        background: #fdecee;
+        color: #c94b57;
+        border-radius: 14px;
+        padding: 0.85rem 1.1rem;
+        font-size: 0.9rem;
+        margin-bottom: 1.25rem;
+        font-weight: 600;
+    }
+
+    .login-submit {
+        border: none;
+        border-radius: 14px;
+        padding: 0.9rem 1rem;
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: #ffffff;
+        background: linear-gradient(135deg, #7fb3f2 0%, #4a7fd6 100%);
+        box-shadow: 0 10px 24px rgba(74, 127, 214, 0.28);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+        cursor: pointer;
+        width: 100%;
+        margin-top: 0.5rem;
+    }
+
+    .login-submit:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 28px rgba(74, 127, 214, 0.34);
+        color: #ffffff;
+    }
+
+    @media (max-width: 767px) {
+        .login-card {
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .login-side {
+            padding: 2.5rem 1.5rem;
+        }
+
+        .login-form-side {
+            padding: 2.5rem 1.75rem;
+        }
+    }
+</style>
+
+<div class="login-wrapper">
+    <div class="login-card">
+        <div class="login-side">
+            <div class="login-side-icon">
+                <i class="bi bi-box-seam-fill"></i>
             </div>
-            <div class="card-custom-body p-4 bg-white">
-                <h2 class="fs-4 text-center mb-4 text-dark font-weight-bold">Acesse sua Conta</h2>
+            <h1>Gestão de Estoque</h1>
+            <p>Armazém &amp; Saúde — controle inteligente do seu estoque em um só lugar.</p>
+        </div>
 
-                <form method="post" novalidate>
-                    {% csrf_token %}
+        <div class="login-form-side">
+            <h2>Acesse sua Conta</h2>
+            <p class="subtitle">Informe seus dados para entrar no sistema.</p>
 
-                    {% for error in form.non_field_errors %}
-                        <div class="alert alert-danger mb-3">
-                            <i class="bi bi-exclamation-circle-fill me-1"></i> {{ error }}
-                        </div>
-                    {% endfor %}
+            <form method="post" novalidate>
+                {% csrf_token %}
 
-                    {% for field in form %}
-                        <div class="mb-3" style="display: flex; justify-content: center;">
-                            <label for="{{ field.id_for_label }}" class="form-label fs-5 fw-bold text-dark" style="margin-right: 10px; text-align: center;">
-                                {{ field.label }}
-                            </label>
-                            {{ field }}
-                            {% for error in field.errors %}
-                                <div class="text-danger fw-bold small mt-1"><i class="bi bi-x-circle-fill me-1"></i> {{ error }}</div>
-                            {% endfor %}
-                        </div>
-                    {% endfor %}
+                {% for error in form.non_field_errors %}
+                    <div class="login-alert">
+                        <i class="bi bi-exclamation-circle-fill me-1"></i> {{ error }}
+                    </div>
+                {% endfor %}
 
-                    <button type="submit" class="btn btn-primary btn-lg w-100 fw-bold mt-3 shadow-sm py-3">
-                        <i class="bi bi-box-arrow-in-right me-2 fs-4"></i> Entrar no Sistema
-                    </button>
-                </form>
-            </div>
+                {% for field in form %}
+                    <div class="login-field">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% for error in field.errors %}
+                            <div class="login-error"><i class="bi bi-x-circle-fill me-1"></i> {{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+
+                <button type="submit" class="login-submit">
+                    <i class="bi bi-box-arrow-in-right me-2"></i> Entrar no Sistema
+                </button>
+            </form>
         </div>
     </div>
 </div>
