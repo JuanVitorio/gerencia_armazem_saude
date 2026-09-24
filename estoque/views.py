@@ -778,6 +778,10 @@ class RequisicaoView(LoginRequiredMixin, View):
             'form': form,
             'produtos': produtos,
             'estoque_central': list(get_unidades_estoque_central()),
+            # Opções de unidade de medida para o seletor por item da lista —
+            # a unidade cadastrada no produto (ex: Caixa) é só a referência
+            # inicial; aqui o usuário pode requisitar em outra (ex: Unidade).
+            'unidade_medida_choices': Produto.UNIDADE_CHOICES,
         }
 
     def get(self, request):
@@ -810,7 +814,15 @@ class RequisicaoView(LoginRequiredMixin, View):
                 produto = produtos_map.get(item['produto_id'])
                 if produto is None:
                     continue  # produto inválido ou fora do estoque central — ignorado silenciosamente
-                itens_finais.append({'produto': produto, 'quantidade': item['quantidade']})
+                itens_finais.append({
+                    'produto': produto,
+                    'quantidade': item['quantidade'],
+                    # Unidade escolhida na requisição (ex: "UN"), que pode ser
+                    # diferente da cadastrada no produto (ex: "CX") — NÃO
+                    # altera produto.unidade_medida, só o que vai impresso
+                    # no PDF. Sem escolha válida, cai na unidade do produto.
+                    'unidade_medida': item.get('unidade_medida') or produto.unidade_medida,
+                })
 
             if not itens_finais:
                 messages.error(request, 'Nenhum item válido encontrado na lista. Adicione os itens novamente.')
