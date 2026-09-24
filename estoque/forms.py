@@ -351,6 +351,8 @@ class RequisicaoForm(BaseFormMixin, forms.Form):
         if not isinstance(dados, list) or not dados:
             raise forms.ValidationError('Adicione ao menos um item à lista antes de gerar o PDF.')
 
+        codigos_validos = {codigo for codigo, _ in Produto.UNIDADE_CHOICES}
+
         itens = []
         for item in dados:
             if not isinstance(item, dict):
@@ -362,7 +364,18 @@ class RequisicaoForm(BaseFormMixin, forms.Form):
                 continue
             if quantidade <= 0:
                 continue
-            itens.append({'produto_id': produto_id, 'quantidade': quantidade})
+            # Unidade de requisição: opcional — o usuário pode requisitar em
+            # uma unidade de medida diferente da cadastrada no produto (ex:
+            # produto cadastrado em Caixa, mas requisitado em Unidade). Se
+            # vier em branco/inválida, RequisicaoView usa a do produto.
+            unidade_medida = item.get('unidade_medida')
+            if unidade_medida not in codigos_validos:
+                unidade_medida = None
+            itens.append({
+                'produto_id': produto_id,
+                'quantidade': quantidade,
+                'unidade_medida': unidade_medida,
+            })
 
         if not itens:
             raise forms.ValidationError('Nenhum item válido encontrado na lista.')
