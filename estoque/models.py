@@ -167,6 +167,7 @@ class Produto(models.Model):
         ('PAR', 'Par'),
         ('RO', 'Rolo'),
         ('SC', 'Saco'),
+        ('FD', 'Fardo'),
     ]
 
     # Relacionamentos
@@ -257,6 +258,21 @@ class Produto(models.Model):
 
     def get_absolute_url(self):
         return reverse('estoque:produto_detail', args=[self.pk])
+
+    def save(self, *args, **kwargs):
+        """
+        Padroniza os campos de texto do produto em MAIÚSCULAS antes de
+        salvar — pedido explícito pra manter o cadastro consistente no
+        banco, não importa se o usuário digitou em minúsculas, maiúsculas
+        ou de forma mista. Feito aqui (e não no form) pra valer em
+        qualquer caminho de cadastro/edição, incluindo o Django Admin.
+        """
+        self.nome = (self.nome or '').upper()
+        self.detalhes = (self.detalhes or '').upper()
+        self.descricao = (self.descricao or '').upper()
+        self.sku = (self.sku or '').upper()
+        self.lote = (self.lote or '').upper()
+        super().save(*args, **kwargs)
 
     @property
     def limite_estoque_baixo_calculado(self):
