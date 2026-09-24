@@ -510,13 +510,19 @@ def relatorio_requisicao(unidade, solicitante, data_solicitacao, itens, titulo=N
     header = ['Produto', 'Qtd. Solicitada']
     rows = [[Paragraph(h, cell_head_style) for h in header]]
 
+    unidade_medida_labels = dict(Produto.UNIDADE_CHOICES)
     for item in itens:
         produto = item['produto']
         quantidade = item['quantidade']
         nome_str = produto.nome
         if produto.detalhes:
             nome_str += f"<br/><font size='7.5' color='#64748B'>{produto.detalhes}</font>"
-        qtd_str = f"{quantidade} {produto.get_unidade_medida_display()}"
+        # Unidade impressa: a escolhida na requisição (item['unidade_medida']),
+        # que pode ser diferente da cadastrada no produto — NÃO usa
+        # produto.get_unidade_medida_display() direto, pra não ignorar a troca.
+        codigo_unidade = item.get('unidade_medida') or produto.unidade_medida
+        unidade_str = unidade_medida_labels.get(codigo_unidade, codigo_unidade)
+        qtd_str = f"{quantidade} {unidade_str}"
         rows.append([
             Paragraph(nome_str, cell_body_style),
             Paragraph(f"<b>{qtd_str}</b>", cell_body_style),
