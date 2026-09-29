@@ -22,10 +22,17 @@ function normalizarBuscaProduto(str) {
     return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
 
-function attachProdutoBusca(sourceSelectEl, inputEl, dropdownEl, onSelect) {
+function attachProdutoBusca(sourceSelectEl, inputEl, dropdownEl, onSelect, opts) {
     if (!sourceSelectEl || !inputEl || !dropdownEl) {
         return;
     }
+    // opts.filtroExtra(produto) -> bool, opcional: reavaliado a cada busca,
+    // então pode depender de um estado que muda na tela (ex: tipo de
+    // movimentação Entrada/Saída) sem precisar reconstruir a lista de
+    // produtos. Usado em movimentacao_form.html pra esconder itens com
+    // estoque 0 quando o tipo é Saída (não faz sentido dar saída do que
+    // não tem em estoque) sem tirá-los da Entrada.
+    var filtroExtra = (opts && typeof opts.filtroExtra === 'function') ? opts.filtroExtra : null;
 
     // Monta a lista de produtos a partir das <option> do select-fonte.
     var produtos = [];
@@ -40,6 +47,10 @@ function attachProdutoBusca(sourceSelectEl, inputEl, dropdownEl, onSelect) {
             detalhes: opt.getAttribute('data-detalhes') || '',
             qtd: opt.getAttribute('data-qtd') || '',
             unidade: opt.getAttribute('data-unidade') || '',
+            // Código bruto da unidade de medida (ex: "CX"), usado só na
+            // Requisição para pré-selecionar a unidade a requisitar —
+            // ver data-unidade-codigo em ProdutoSelect/requisicao_form.html.
+            unidadeCodigo: opt.getAttribute('data-unidade-codigo') || '',
         });
     });
 
@@ -110,7 +121,8 @@ function attachProdutoBusca(sourceSelectEl, inputEl, dropdownEl, onSelect) {
             esconderDropdown();
             return;
         }
-        var filtrados = produtos.filter(function (p) {
+        var candidatos = filtroExtra ? produtos.filter(filtroExtra) : produtos;
+        var filtrados = candidatos.filter(function (p) {
             return (
                 normalizarBuscaProduto(p.label).indexOf(termo) !== -1 ||
                 normalizarBuscaProduto(p.sku).indexOf(termo) !== -1 ||
@@ -119,6 +131,8 @@ function attachProdutoBusca(sourceSelectEl, inputEl, dropdownEl, onSelect) {
         }).slice(0, 8);
         renderDropdown(filtrados);
     }
+
+
 
     function marcarAtivo(novoIndice) {
         var itens = dropdownEl.querySelectorAll('.produto-busca-item');
@@ -168,4 +182,15 @@ function attachProdutoBusca(sourceSelectEl, inputEl, dropdownEl, onSelect) {
             esconderDropdown();
         }
     });
+
+    // Pra quem chamou poder forçar um novo filtro sem o usuário digitar de
+    // novo — ex: ao trocar Entrada/Saída, se o dropdown já estiver aberto,
+    // atualiza a lista imediatamente pra refletir a troca de filtroExtra.
+    return {
+        refiltrar: function () {
+            if (inputEl.value.trim()) {
+                filtrar(inputEl.value);
+            }
+        },
+    };
 }
