@@ -116,6 +116,16 @@
                     <label class="form-label-compact">Quantidade</label>
                     <input type="number" id="req-quantidade-input" class="form-control" min="1" value="1">
                 </div>
+                <div class="form-col-sm" style="max-width: 160px;">
+                    <label class="form-label-compact">
+                        Unidade <span class="form-hint">pra requisitar</span>
+                    </label>
+                    <select id="req-unidade-input" class="form-control">
+                        {% for codigo, label in unidade_medida_choices %}
+                        <option value="{{ codigo }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
                 <div class="form-col-sm" style="flex: 0 0 auto;">
                     <button type="button" id="btn-add-item" class="btn btn-primary" disabled>
                         <i class="bi bi-plus-lg"></i> Adicionar à Lista
@@ -123,6 +133,10 @@
                 </div>
             </div>
             <small class="form-hint" id="req-produto-selecionado-hint">Selecione um produto na busca acima.</small>
+            <small class="form-hint">
+                A unidade já vem preenchida com a que está cadastrada no produto, mas pode trocar — ex: produto
+                cadastrado em Caixa, mas você só precisa requisitar 1 Unidade daquela caixa.
+            </small>
 
             <!-- Catálogo do estoque central (Secretaria) — fonte de dados para a busca (oculto) -->
             <select id="req-produtos-catalogo" class="d-none">
@@ -132,7 +146,17 @@
                         data-sku="{{ p.sku|default:'' }}"
                         data-detalhes="{{ p.detalhes|default:'' }}"
                         data-qtd="{{ p.quantidade }}"
-                        data-unidade="{{ p.get_unidade_medida_display }}">{{ p.nome }}</option>
+                        data-unidade="{{ p.get_unidade_medida_display }}"
+                        data-unidade-codigo="{{ p.unidade_medida }}">{{ p.nome }}</option>
+                {% endfor %}
+            </select>
+
+            <!-- Modelo (oculto) dos <option> de Unidade de Medida, clonado pra cada
+                 linha da tabela — mesma lista do select acima, só que sem ligar a
+                 nenhum produto específico. -->
+            <select id="req-unidade-template" class="d-none">
+                {% for codigo, label in unidade_medida_choices %}
+                <option value="{{ codigo }}">{{ label }}</option>
                 {% endfor %}
             </select>
         </div>
@@ -148,13 +172,14 @@
                     <thead>
                         <tr>
                             <th>Produto</th>
-                            <th style="width: 130px;">Quantidade</th>
+                            <th style="width: 110px;">Quantidade</th>
+                            <th style="width: 150px;">Unidade</th>
                             <th class="text-end" style="width: 70px;">Remover</th>
                         </tr>
                     </thead>
                     <tbody id="req-tabela-corpo">
                         <tr id="req-linha-vazia">
-                            <td colspan="3">
+                            <td colspan="4">
                                 <div class="empty-state-inline">
                                     <i class="bi bi-inbox"></i>
                                     <p>Nenhum item adicionado ainda.</p>
@@ -183,6 +208,8 @@ document.addEventListener('DOMContentLoaded', function () {
     var input = document.getElementById('req-produto-input');
     var dropdown = document.getElementById('req-produto-dropdown');
     var qtdInput = document.getElementById('req-quantidade-input');
+    var unidadeInput = document.getElementById('req-unidade-input');
+    var unidadeTemplate = document.getElementById('req-unidade-template');
     var btnAdd = document.getElementById('btn-add-item');
     var hint = document.getElementById('req-produto-selecionado-hint');
     var itensJsonInput = document.getElementById('{{ form.itens_json.id_for_label }}');
@@ -199,15 +226,42 @@ document.addEventListener('DOMContentLoaded', function () {
     var fieldData = document.getElementById('{{ form.data_solicitacao.id_for_label }}');
 
     var produtoSelecionado = null;
-    var itens = []; // [{ produto: {id, label, sku, unidade}, quantidade: n }]
+    // [{ produto: {id, label, sku, unidade}, quantidade: n,
+    //    unidadeMedida: {codigo, label} }] — unidadeMedida é a unidade
+    // escolhida PRA ESSA requisição, que pode ser diferente da cadastrada
+    // no produto (produto.unidade só serve de valor inicial/referência).
+    var itens = [];
 
     function textoTotal() {
         return itens.length + (itens.length === 1 ? ' item' : ' itens');
     }
 
+    // Clona o <select> de unidades de medida (#req-unidade-template) pra
+    // usar numa linha da tabela, já com o valor certo selecionado.
+    function criarSelectUnidade(codigoSelecionado) {
+        var select = unidadeTemplate.cloneNode(true);
+        select.removeAttribute('id');
+        select.classList.remove('d-none');
+        select.className = 'form-control form-control-sm';
+        select.style.width = '100%';
+        if (codigoSelecionado) {
+            select.value = codigoSelecionado;
+        }
+        return select;
+    }
+
+    function labelUnidade(codigo) {
+        var opt = unidadeTemplate.querySelector('option[value="' + codigo + '"]');
+        return opt ? opt.textContent : codigo;
+    }
+
     function atualizarJson() {
         var payload = itens.map(function (item) {
-            return { produto_id: item.produto.id, quantidade: item.quantidade };
+            return {
+                produto_id: item.produto.id,
+                quantidade: item.quantidade,
+                unidade_medida: item.unidadeMedida.codigo,
+            };
         });
         itensJsonInput.value = JSON.stringify(payload);
     }
@@ -259,6 +313,16 @@ document.addEventListener('DOMContentLoaded', function () {
             tdQtd.appendChild(inputQtd);
             tr.appendChild(tdQtd);
 
+            // Coluna Unidade (editável) — pode divergir da cadastrada no produto
+            var tdUnidade = document.createElement('td');
+            var selectUnidade = criarSelectUnidade(item.unidadeMedida.codigo);
+            selectUnidade.addEventListener('change', function () {
+                item.unidadeMedida = { codigo: selectUnidade.value, label: labelUnidade(selectUnidade.value) };
+                atualizarJson();
+            });
+            tdUnidade.appendChild(selectUnidade);
+            tr.appendChild(tdUnidade);
+
             // Coluna Remover
             var tdRemove = document.createElement('td');
             tdRemove.className = 'text-end';
@@ -284,6 +348,10 @@ document.addEventListener('DOMContentLoaded', function () {
         input.value = produto.label;
         btnAdd.disabled = false;
         hint.textContent = 'Estoque na Secretaria: ' + (produto.qtd || '0') + ' ' + produto.unidade;
+        // Unidade parte sempre da cadastrada no produto — o usuário troca se precisar.
+        if (produto.unidadeCodigo) {
+            unidadeInput.value = produto.unidadeCodigo;
+        }
     });
 
     input.addEventListener('input', function () {
@@ -301,11 +369,19 @@ document.addEventListener('DOMContentLoaded', function () {
             qtd = 1;
         }
 
-        var existente = itens.filter(function (it) { return it.produto.id === produtoSelecionado.id; })[0];
+        var unidadeEscolhida = { codigo: unidadeInput.value, label: labelUnidade(unidadeInput.value) };
+
+        // Já existe o mesmo produto NA MESMA unidade escolhida? Soma. Produto
+        // repetido mas em unidade diferente (ex: 1 Caixa + 3 Unidade soltas
+        // do mesmo produto) entra como uma linha própria, pra não misturar
+        // quantidades de unidades diferentes numa soma sem sentido.
+        var existente = itens.filter(function (it) {
+            return it.produto.id === produtoSelecionado.id && it.unidadeMedida.codigo === unidadeEscolhida.codigo;
+        })[0];
         if (existente) {
             existente.quantidade += qtd;
         } else {
-            itens.push({ produto: produtoSelecionado, quantidade: qtd });
+            itens.push({ produto: produtoSelecionado, quantidade: qtd, unidadeMedida: unidadeEscolhida });
         }
 
         renderTabela();
@@ -393,13 +469,19 @@ document.addEventListener('DOMContentLoaded', function () {
                     label: opt.textContent.trim(),
                     sku: opt.getAttribute('data-sku') || '',
                     unidade: opt.getAttribute('data-unidade') || '',
+                    unidadeCodigo: opt.getAttribute('data-unidade-codigo') || '',
                 };
             }
         });
         (brutos || []).forEach(function (item) {
             var produto = mapaProdutos[String(item.produto_id)];
             if (produto) {
-                itens.push({ produto: produto, quantidade: item.quantidade });
+                var codigo = item.unidade_medida || produto.unidadeCodigo || 'UN';
+                itens.push({
+                    produto: produto,
+                    quantidade: item.quantidade,
+                    unidadeMedida: { codigo: codigo, label: labelUnidade(codigo) },
+                });
             }
         });
     })();

@@ -115,14 +115,51 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    attachProdutoBusca(selectOriginal, input, dropdown, function (produto) {
+    var radiosTipo = document.querySelectorAll('input[name="tipo"]');
+
+    function tipoAtual() {
+        var marcado = document.querySelector('input[name="tipo"]:checked');
+        return marcado ? marcado.value : 'ENTRADA';
+    }
+
+    // Saída não pode ser de um produto com estoque 0 — por isso esses itens
+    // não aparecem nem como opção de busca quando o tipo é Saída. Na
+    // Entrada eles continuam aparecendo normalmente (é assim que se
+    // reabastece um item zerado).
+    var busca = attachProdutoBusca(selectOriginal, input, dropdown, function (produto) {
         selectOriginal.value = produto.id;
         input.value = produto.label;
+    }, {
+        filtroExtra: function (produto) {
+            if (tipoAtual() !== 'SAIDA') {
+                return true;
+            }
+            return parseInt(produto.qtd, 10) > 0;
+        },
     });
 
     // Se o usuário editar o texto sem selecionar um novo item, invalida a seleção anterior.
     input.addEventListener('input', function () {
         selectOriginal.value = '';
+    });
+
+    // Ao trocar Entrada/Saída: se já tinha um produto escolhido e ele ficou
+    // sem estoque (0) ao virar Saída, limpa a seleção pra evitar confirmar
+    // uma saída de algo que não tem mais — melhor pedir pra escolher de novo.
+    radiosTipo.forEach(function (radio) {
+        radio.addEventListener('change', function () {
+            if (tipoAtual() === 'SAIDA' && selectOriginal.value) {
+                var opt = selectOriginal.querySelector('option[value="' + selectOriginal.value + '"]');
+                var qtd = opt ? parseInt(opt.getAttribute('data-qtd'), 10) : 0;
+                if (!qtd || qtd <= 0) {
+                    selectOriginal.value = '';
+                    input.value = '';
+                }
+            }
+            if (busca) {
+                busca.refiltrar();
+            }
+        });
     });
 });
 </script>
