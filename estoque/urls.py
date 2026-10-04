@@ -19,6 +19,8 @@ urlpatterns = [
     path('produtos/', views.ProdutoListView.as_view(), name='produto_list'),
     path('produtos/novo/', views.ProdutoCreateView.as_view(), name='produto_create'),
     path('produtos/busca-ajax/', views.ProdutoBuscaAjaxView.as_view(), name='produto_busca_ajax'),
+    path('produtos/importar-requisicao/', views.ImportarRequisicaoView.as_view(), name='produto_importar_requisicao'),
+    path('produtos/importar-requisicao/confirmar/', views.ConfirmarImportacaoView.as_view(), name='produto_importar_confirmar'),
     path('produtos/<int:pk>/', views.ProdutoDetailView.as_view(), name='produto_detail'),
     path('produtos/<int:pk>/editar/', views.ProdutoUpdateView.as_view(), name='produto_update'),
     path('produtos/<int:pk>/excluir/', views.ProdutoDeleteView.as_view(), name='produto_delete'),
@@ -32,6 +34,10 @@ urlpatterns = [
 
     # NOVO: Requisição de Materiais (Lista de Faltantes + Gerador de PDF)
     path('requisicao/', views.RequisicaoView.as_view(), name='requisicao'),
+
+    # Divergências de estoque da Secretaria (admin only)
+    path('divergencias/', views.DivergenciaListView.as_view(), name='divergencia_list'),
+    path('divergencias/<int:pk>/resolver/', views.DivergenciaResolverView.as_view(), name='divergencia_resolver'),
 
     # Usuários (admin only)
     path('usuarios/', views.UsuarioListView.as_view(), name='usuario_list'),

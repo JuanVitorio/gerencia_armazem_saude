@@ -61,6 +61,10 @@
                href="{% url 'estoque:funcionario_list' %}" title="Banco de Dias de Folga">
                 <i class="bi bi-calendar-heart"></i> Dias de Folga
             </a>
+            <a class="nav-link nav-link-admin {% if 'divergencia' in request.resolver_match.url_name %}active{% endif %}"
+               href="{% url 'estoque:divergencia_list' %}" title="Divergências de estoque da Secretaria">
+                <i class="bi bi-exclamation-diamond"></i> Divergências
+            </a>
             {% elif user.perfil and user.perfil.is_admin %}
             <div class="nav-separator"></div>
             <a class="nav-link nav-link-admin {% if 'unidade' in request.resolver_match.url_name %}active{% endif %}"
@@ -74,6 +78,10 @@
             <a class="nav-link nav-link-admin {% if 'funcionario' in request.resolver_match.url_name or 'lancamento' in request.resolver_match.url_name or 'evento_folga' in request.resolver_match.url_name %}active{% endif %}"
                href="{% url 'estoque:funcionario_list' %}">
                 <i class="bi bi-calendar-heart"></i> Dias de Folga
+            </a>
+            <a class="nav-link nav-link-admin {% if 'divergencia' in request.resolver_match.url_name %}active{% endif %}"
+               href="{% url 'estoque:divergencia_list' %}" title="Divergências de estoque da Secretaria">
+                <i class="bi bi-exclamation-diamond"></i> Divergências
             </a>
             {% endif %}
         </div>
@@ -167,6 +175,9 @@
             </a>
             <a class="nav-link-mobile" href="{% url 'estoque:funcionario_list' %}">
                 <i class="bi bi-calendar-heart"></i> Dias de Folga
+            </a>
+            <a class="nav-link-mobile" href="{% url 'estoque:divergencia_list' %}">
+                <i class="bi bi-exclamation-diamond"></i> Divergências
             </a>
             {% endif %}
         </nav>

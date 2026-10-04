@@ -1,0 +1,200 @@
+{% extends 'estoque/base.html' %}
+{% block title %}Importar Requisição — Gestão de Estoque{% endblock %}
+
+{% block extra_head %}
+<style>
+    .import-table td { vertical-align: top; }
+    .import-table tr.is-excluido td:not(:first-child) { opacity: .45; }
+    .import-table tr.has-error { outline: 2px solid #dc3545; outline-offset: -2px; }
+    .import-qtd { display: flex; align-items: center; gap: .4rem; }
+    .import-qtd input { width: 5.5rem; }
+    .import-central { color: #64748B; font-size: .78rem; margin-top: .25rem; }
+    .import-aviso { color: #B45309; font-size: .78rem; margin-top: .25rem; }
+    .import-rastreio { display: flex; gap: .4rem; margin-top: .4rem; }
+    .import-rastreio input { min-width: 0; }
+    .import-footer {
+        display: flex; justify-content: flex-end; align-items: center; gap: .5rem;
+        flex-wrap: wrap; margin-top: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-container">
+
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">
+                <i class="bi bi-file-earmark-arrow-down text-primary"></i> Confirmar Importação
+            </h1>
+            <p class="page-subtitle">
+                <strong>{{ titulo }}</strong>
+                {% if data_solicitacao %} · {{ data_solicitacao|date:'d/m/Y' }}{% endif %}
+                {% if solicitante %} · Solicitante: {{ solicitante }}{% endif %}
+                <br>
+                <i class="bi bi-geo-alt-fill text-primary"></i> Entrada no estoque de <strong>{{ unidade.nome }}</strong>.
+                Confira as quantidades que você <strong>realmente recebeu</strong> e desmarque o que não veio.
+            </p>
+        </div>
+    </div>
+
+    {% if itens_removidos %}
+    <div class="alert-inline alert-inline-danger">
+        <i class="bi bi-exclamation-octagon-fill"></i>
+        {{ itens_removidos }} item(ns) desta requisição foram excluídos do estoque da Secretaria e não podem ser importados.
+    </div>
+    {% endif %}
+
+    <form method="post" action="{% url 'estoque:produto_importar_confirmar' %}" id="form-confirmar-importacao" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="dados" value="{{ token }}">
+
+        <div class="table-card">
+            <div class="table-responsive">
+                <table class="data-table import-table">
+                    <thead>
+                        <tr>
+                            <th style="width:2.5rem;">
+                                <input type="checkbox" class="form-check-input" id="marcar-todos" checked title="Marcar/desmarcar todos">
+                            </th>
+                            <th>Produto</th>
+                            <th>Qtd. recebida</th>
+                            <th>No estoque do posto</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for linha in linhas %}
+                    {% with i=linha.indice central=linha.central %}
+                        <tr class="import-linha{% if not linha.incluir %} is-excluido{% endif %}{% if linha.erro %} has-error{% endif %}"
+                            {% if central %}
+                            data-disponivel="{{ central.quantidade }}"
+                            data-mesma-unidade="{% if linha.unidade_medida == central.unidade_medida %}1{% else %}0{% endif %}"
+                            {% endif %}>
+                            <td>
+                                <input type="checkbox" class="form-check-input import-incluir" name="incluir_{{ i }}"
+                                       {% if linha.incluir %}checked{% endif %} {% if not central %}disabled{% endif %}>
+                            </td>
+                            <td>
+                                {% if central %}
+                                    <strong>{{ central.nome }}</strong>
+                                    {% if central.detalhes %}<span class="item-detail">{{ central.detalhes }}</span>{% endif %}
+                                    {% if central.categoria %}<span class="cat-tag">{{ central.categoria.nome }}</span>{% endif %}
+                                    <div class="import-central">
+                                        <i class="bi bi-building"></i> {{ central.unidade.nome }}: {{ central.quantidade }} {{ central.get_unidade_medida_display }} no sistema
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted">Produto excluído do estoque da Secretaria</span>
+                                {% endif %}
+                                {% if linha.erro %}<div class="field-error">{{ linha.erro }}</div>{% endif %}
+                            </td>
+                            <td>
+                                <div class="import-qtd">
+                                    <input type="number" min="1" name="quantidade_{{ i }}" value="{{ linha.quantidade }}"
+                                           class="form-control form-control-sm import-quantidade" {% if not central %}disabled{% endif %}>
+                                    <span>{{ linha.unidade_medida_label }}</span>
+                                </div>
+                                {% if central %}
+                                <div class="import-aviso import-aviso-unidade" {% if linha.unidade_medida == central.unidade_medida %}hidden{% endif %}>
+                                    <i class="bi bi-info-circle"></i> A Secretaria controla em {{ central.get_unidade_medida_display }}:
+                                    a baixa lá ficará para o administrador.
+                                </div>
+                                <div class="import-aviso import-aviso-estoque" hidden>
+                                    <i class="bi bi-info-circle"></i> Mais do que o sistema da Secretaria tem —
+                                    a diferença será registrada para conferência.
+                                </div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if central %}
+                                <select name="destino_{{ i }}" class="form-select form-select-sm import-destino">
+                                    {% for candidato in linha.candidatos %}
+                                    <option value="{{ candidato.pk }}" {% if linha.destino == candidato.pk|stringformat:'s' %}selected{% endif %}>
+                                        Somar a: {{ candidato.nome }}{% if candidato.detalhes %} — {{ candidato.detalhes }}{% endif %}
+                                        ({{ candidato.quantidade }} {{ candidato.get_unidade_medida_display }})
+                                    </option>
+                                    {% endfor %}
+                                    <option value="{{ destino_novo }}" {% if linha.destino == destino_novo %}selected{% endif %}>
+                                        Cadastrar como produto novo
+                                    </option>
+                                </select>
+                                <div class="import-rastreio" {% if linha.destino != destino_novo %}hidden{% endif %}>
+                                    <input type="text" name="lote_{{ i }}" value="{{ linha.lote }}" maxlength="50"
+                                           class="form-control form-control-sm" placeholder="Lote (opcional)">
+                                    <input type="date" name="validade_{{ i }}" value="{{ linha.validade }}"
+                                           class="form-control form-control-sm" title="Validade (opcional)">
+                                </div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endwith %}
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="import-footer">
+            <span class="text-muted small" id="resumo-selecionados"></span>
+            <a href="{% url 'estoque:produto_list' %}" class="btn btn-outline-secondary btn-sm">Cancelar</a>
+            <button type="submit" class="btn btn-primary btn-sm" id="btn-confirmar-importacao">
+                <i class="bi bi-check2-circle"></i> Confirmar entrada
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+    var linhas = Array.prototype.slice.call(document.querySelectorAll('.import-linha'));
+    var marcarTodos = document.getElementById('marcar-todos');
+    var resumo = document.getElementById('resumo-selecionados');
+    var botao = document.getElementById('btn-confirmar-importacao');
+
+    function atualizarLinha(tr) {
+        var incluir = tr.querySelector('.import-incluir');
+        var qtd = tr.querySelector('.import-quantidade');
+        var destino = tr.querySelector('.import-destino');
+        var rastreio = tr.querySelector('.import-rastreio');
+        var avisoEstoque = tr.querySelector('.import-aviso-estoque');
+
+        tr.classList.toggle('is-excluido', !incluir.checked);
+        if (destino && rastreio) rastreio.hidden = destino.value !== '{{ destino_novo }}';
+        if (avisoEstoque) {
+            var excede = tr.dataset.mesmaUnidade === '1'
+                && parseInt(qtd.value, 10) > parseInt(tr.dataset.disponivel, 10);
+            avisoEstoque.hidden = !excede;
+        }
+    }
+
+    function atualizarResumo() {
+        var total = linhas.filter(function (tr) { return tr.querySelector('.import-incluir').checked; }).length;
+        resumo.textContent = total + (total === 1 ? ' item selecionado' : ' itens selecionados');
+        botao.disabled = total === 0;
+    }
+
+    linhas.forEach(function (tr) {
+        tr.addEventListener('input', function () { atualizarLinha(tr); atualizarResumo(); });
+        tr.addEventListener('change', function () { atualizarLinha(tr); atualizarResumo(); });
+        atualizarLinha(tr);
+    });
+
+    marcarTodos.addEventListener('change', function () {
+        linhas.forEach(function (tr) {
+            var cb = tr.querySelector('.import-incluir');
+            if (!cb.disabled) cb.checked = marcarTodos.checked;
+            atualizarLinha(tr);
+        });
+        atualizarResumo();
+    });
+
+    // Evita duplo clique gerando dois envios.
+    document.getElementById('form-confirmar-importacao').addEventListener('submit', function () {
+        botao.disabled = true;
+    });
+
+    atualizarResumo();
+})();
+</script>
+{% endblock %}
