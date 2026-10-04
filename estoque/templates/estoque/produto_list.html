@@ -1,6 +1,25 @@
 {% extends 'estoque/base.html' %}
 {% block title %}Produtos — Gestão de Estoque{% endblock %}
 
+{% block extra_head %}
+<style>
+    /* Área para soltar o PDF da requisição (ver ImportarRequisicaoView) */
+    .import-dropzone {
+        display: flex; align-items: center; gap: .75rem;
+        border: 2px dashed #CBD5E1; border-radius: 10px;
+        background: #F8FAFC; padding: .75rem 1rem; margin-bottom: 1rem;
+        color: #475569; font-size: .875rem; cursor: pointer;
+        transition: border-color .15s, background .15s;
+    }
+    .import-dropzone:hover, .import-dropzone.is-dragover {
+        border-color: #0284C7; background: #F0F9FF; color: #0F172A;
+    }
+    .import-dropzone > i { font-size: 1.5rem; color: #0284C7; }
+    .import-dropzone .import-dropzone-hint { color: #64748B; font-size: .8rem; }
+    .import-dropzone.is-sending { opacity: .6; pointer-events: none; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-container">
 
@@ -17,6 +36,22 @@
             <i class="bi bi-plus-lg"></i> Cadastrar Produto
         </a>
     </div>
+
+    <!-- Importar requisição: soltar o PDF gerado em "Requisição" para dar
+         entrada de todos os itens de uma vez (com tela de confirmação). -->
+    <form method="post" enctype="multipart/form-data" id="form-importar-requisicao"
+          action="{% url 'estoque:produto_importar_requisicao' %}">
+        {% csrf_token %}
+        <label class="import-dropzone" id="import-dropzone" for="input-importar-requisicao">
+            <i class="bi bi-file-earmark-arrow-down"></i>
+            <span>
+                <strong>Recebeu materiais da Secretaria?</strong>
+                Arraste aqui o PDF da requisição (ou clique para escolher) para dar entrada em todos os itens de uma vez.
+                <span class="import-dropzone-hint d-block">Você revisa os itens antes de confirmar.</span>
+            </span>
+        </label>
+        <input type="file" name="arquivo" accept="application/pdf,.pdf" id="input-importar-requisicao" hidden>
+    </form>
 
     <!-- Filtros compactos -->
     <div class="filter-bar">
@@ -187,6 +222,34 @@
 
 {% block extra_scripts %}
 <script>
+// Importar requisição: envia o PDF assim que for escolhido ou solto na área.
+(function () {
+    var form = document.getElementById('form-importar-requisicao');
+    var zona = document.getElementById('import-dropzone');
+    var input = document.getElementById('input-importar-requisicao');
+    if (!form || !zona || !input) return;
+
+    function enviar() {
+        if (!input.files.length) return;
+        zona.classList.add('is-sending');
+        form.submit();
+    }
+    input.addEventListener('change', enviar);
+
+    ['dragenter', 'dragover'].forEach(function (ev) {
+        zona.addEventListener(ev, function (e) { e.preventDefault(); zona.classList.add('is-dragover'); });
+    });
+    ['dragleave', 'drop'].forEach(function (ev) {
+        zona.addEventListener(ev, function (e) { e.preventDefault(); zona.classList.remove('is-dragover'); });
+    });
+    zona.addEventListener('drop', function (e) {
+        var arquivos = e.dataTransfer.files;
+        if (!arquivos.length) return;
+        input.files = arquivos;
+        enviar();
+    });
+})();
+
 (function () {
     var urlBusca = '{% url "estoque:produto_busca_ajax" %}';
     var csrfToken = '{{ csrf_token }}';

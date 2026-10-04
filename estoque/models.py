@@ -412,6 +412,95 @@ class Movimentacao(models.Model):
 
 
 # ---------------------------------------------------------------------------
+# Importação de Requisição (PDF → estoque da unidade)
+# ---------------------------------------------------------------------------
+
+class ImportacaoRequisicao(models.Model):
+    """
+    Registro de que o PDF de uma requisição já foi importado para o estoque
+    de uma unidade. O `codigo` vem embutido no próprio PDF (gerado em
+    RequisicaoView) e é único — é ele que impede o mesmo PDF de ser
+    importado duas vezes e somar os itens em dobro.
+    """
+    codigo = models.UUIDField('Código da requisição', unique=True)
+    unidade = models.ForeignKey(
+        Unidade, on_delete=models.PROTECT, related_name='importacoes_requisicao',
+        verbose_name='Unidade de destino',
+    )
+    titulo = models.CharField('Título', max_length=100, blank=True)
+    solicitante = models.CharField('Solicitante', max_length=150, blank=True)
+    data_solicitacao = models.DateField('Data da requisição', null=True, blank=True)
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        verbose_name='Importado por',
+    )
+    criado_em = models.DateTimeField('Importado em', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Importação de Requisição'
+        verbose_name_plural = 'Importações de Requisição'
+        ordering = ['-criado_em']
+
+    def __str__(self):
+        titulo = self.titulo or 'Requisição de Materiais'
+        data = f' de {self.data_solicitacao:%d/%m/%Y}' if self.data_solicitacao else ''
+        return f'{titulo}{data} — {self.unidade.nome}'
+
+
+class DivergenciaEstoque(models.Model):
+    """
+    Diferença entre o estoque do SISTEMA e o estoque FÍSICO da Secretaria,
+    detectada ao importar uma requisição: o posto recebeu mais do que o
+    sistema dizia existir no estoque central. A importação nunca é
+    bloqueada por isso — dá-se baixa no que existe e a diferença fica
+    registrada aqui, para um administrador conferir e ajustar depois.
+    """
+    ESTOQUE_INSUFICIENTE = 'ESTOQUE_INSUFICIENTE'
+    UNIDADE_MEDIDA_DIFERENTE = 'UNIDADE_MEDIDA_DIFERENTE'
+    TIPO_CHOICES = [
+        (ESTOQUE_INSUFICIENTE, 'Estoque do sistema menor que o entregue'),
+        (UNIDADE_MEDIDA_DIFERENTE, 'Unidade de medida diferente (baixa não feita)'),
+    ]
+
+    tipo = models.CharField('Tipo', max_length=30, choices=TIPO_CHOICES)
+    produto = models.ForeignKey(
+        Produto, on_delete=models.CASCADE, related_name='divergencias',
+        verbose_name='Produto (estoque central)',
+    )
+    importacao = models.ForeignKey(
+        ImportacaoRequisicao, on_delete=models.CASCADE, related_name='divergencias',
+        verbose_name='Importação de origem',
+    )
+    quantidade_entregue = models.PositiveIntegerField('Quantidade entregue')
+    unidade_medida_entregue = models.CharField(
+        'Unidade de medida entregue', max_length=3, choices=Produto.UNIDADE_CHOICES,
+    )
+    quantidade_sistema = models.PositiveIntegerField('Quantidade no sistema (antes da baixa)')
+    quantidade_baixada = models.PositiveIntegerField('Quantidade baixada', default=0)
+
+    resolvida = models.BooleanField('Resolvida', default=False)
+    resolvida_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='divergencias_resolvidas', verbose_name='Resolvida por',
+    )
+    resolvida_em = models.DateTimeField('Resolvida em', null=True, blank=True)
+    criado_em = models.DateTimeField('Registrada em', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Divergência de Estoque'
+        verbose_name_plural = 'Divergências de Estoque'
+        ordering = ['resolvida', '-criado_em']
+
+    def __str__(self):
+        return f'{self.get_tipo_display()} — {self.produto.nome}'
+
+    @property
+    def quantidade_faltante(self):
+        """Quanto foi entregue além do que o sistema permitiu baixar."""
+        return self.quantidade_entregue - self.quantidade_baixada
+
+
+# ---------------------------------------------------------------------------
 # Banco de Dias de Folga
 # ---------------------------------------------------------------------------
 

@@ -1,0 +1,96 @@
+{% extends 'estoque/base.html' %}
+{% block title %}Divergências de Estoque — Gestão de Estoque{% endblock %}
+
+{% block content %}
+<div class="page-container">
+
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">
+                <i class="bi bi-exclamation-diamond text-primary"></i> Divergências de Estoque
+            </h1>
+            <p class="page-subtitle">
+                Registradas automaticamente quando um posto importa uma requisição e o estoque da
+                Secretaria no sistema não bate com o que foi entregue. Ajuste o estoque por uma
+                Movimentação e depois marque a divergência como resolvida.
+            </p>
+        </div>
+        {% if mostrar_resolvidas %}
+        <a href="{% url 'estoque:divergencia_list' %}" class="btn btn-outline-secondary btn-sm">Só pendentes</a>
+        {% else %}
+        <a href="?resolvidas=1" class="btn btn-outline-secondary btn-sm">Mostrar resolvidas</a>
+        {% endif %}
+    </div>
+
+    <div class="table-card">
+        <div class="table-responsive">
+            <table class="data-table" id="tabela-divergencias">
+                <thead>
+                    <tr>
+                        <th>Produto (Secretaria)</th>
+                        <th>Situação</th>
+                        <th>Entregue</th>
+                        <th>No sistema</th>
+                        <th>Baixado</th>
+                        <th>Requisição</th>
+                        <th class="text-end">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for d in divergencias %}
+                    <tr>
+                        <td>
+                            <a href="{{ d.produto.get_absolute_url }}" class="item-link-dark">{{ d.produto.nome }}</a>
+                            {% if d.produto.detalhes %}<span class="item-detail">{{ d.produto.detalhes }}</span>{% endif %}
+                        </td>
+                        <td>
+                            {% if d.tipo == 'UNIDADE_MEDIDA_DIFERENTE' %}
+                            <span class="status-tag status-warning">Unidade diferente</span>
+                            {% else %}
+                            <span class="status-tag status-danger">Faltaram {{ d.quantidade_faltante }} no sistema</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ d.quantidade_entregue }} {{ d.get_unidade_medida_entregue_display }}</td>
+                        <td>{{ d.quantidade_sistema }} {{ d.produto.get_unidade_medida_display }}</td>
+                        <td>{{ d.quantidade_baixada }}</td>
+                        <td>
+                            {{ d.importacao.titulo|default:'Requisição de Materiais' }}
+                            <span class="item-detail">
+                                {{ d.importacao.unidade.nome }} ·
+                                importada em {{ d.importacao.criado_em|date:'d/m/Y H:i' }}
+                                {% if d.importacao.usuario %}por {{ d.importacao.usuario.get_full_name|default:d.importacao.usuario.username }}{% endif %}
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            {% if d.resolvida %}
+                            <span class="status-tag status-success" title="{{ d.resolvida_em|date:'d/m/Y H:i' }}">
+                                <i class="bi bi-check2"></i> Resolvida{% if d.resolvida_por %} por {{ d.resolvida_por.username }}{% endif %}
+                            </span>
+                            {% else %}
+                            <form method="post" action="{% url 'estoque:divergencia_resolver' d.pk %}" class="m-0">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline-success btn-sm">
+                                    <i class="bi bi-check2"></i> Marcar resolvida
+                                </button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="7">
+                            <div class="empty-state-inline">
+                                <i class="bi bi-check2-all"></i>
+                                <p>Nenhuma divergência {% if not mostrar_resolvidas %}pendente{% endif %}.</p>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% include 'estoque/_paginacao.html' %}
+</div>
+{% endblock %}

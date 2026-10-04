@@ -1,6 +1,9 @@
 from django.contrib import admin, messages
 
-from .models import Categoria, EventoFolga, Funcionario, LancamentoFolga, Movimentacao, PerfilUsuario, Produto, Unidade
+from .models import (
+    Categoria, DivergenciaEstoque, EventoFolga, Funcionario, ImportacaoRequisicao, LancamentoFolga,
+    Movimentacao, PerfilUsuario, Produto, Unidade,
+)
 
 
 class SemUnidadeFilter(admin.SimpleListFilter):
@@ -138,4 +141,23 @@ class LancamentoFolgaAdmin(admin.ModelAdmin):
     list_filter = ('tipo', 'data_referencia')
     search_fields = ('funcionario__nome', 'motivo')
     autocomplete_fields = ('funcionario', 'evento')
+    readonly_fields = ('criado_em',)
+
+
+@admin.register(ImportacaoRequisicao)
+class ImportacaoRequisicaoAdmin(admin.ModelAdmin):
+    list_display = ('__str__', 'unidade', 'solicitante', 'usuario', 'criado_em')
+    list_filter = ('unidade',)
+    search_fields = ('titulo', 'solicitante', 'codigo')
+    readonly_fields = ('codigo', 'criado_em')
+
+
+@admin.register(DivergenciaEstoque)
+class DivergenciaEstoqueAdmin(admin.ModelAdmin):
+    list_display = (
+        'produto', 'tipo', 'quantidade_entregue', 'quantidade_sistema',
+        'quantidade_baixada', 'resolvida', 'criado_em',
+    )
+    list_filter = ('tipo', 'resolvida')
+    search_fields = ('produto__nome',)
     readonly_fields = ('criado_em',)

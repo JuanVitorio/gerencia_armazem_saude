@@ -19,7 +19,7 @@ from django.views.generic import (
     TemplateView, UpdateView, View,
 )
 
-from . import relatorios
+from . import importacao, relatorios
 from .forms import (
     EventoFolgaForm, FuncionarioFiltroForm, FuncionarioForm, LancamentoFolgaForm,
     MovimentacaoFiltroForm, MovimentacaoForm,
@@ -27,7 +27,8 @@ from .forms import (
     RequisicaoForm, UsuarioForm,
 )
 from .models import (
-    Categoria, EventoFolga, Funcionario, LancamentoFolga, Movimentacao, PerfilUsuario, Produto, Unidade,
+    Categoria, DivergenciaEstoque, EventoFolga, Funcionario, LancamentoFolga, Movimentacao,
+    PerfilUsuario, Produto, Unidade,
 )
 
 
@@ -829,12 +830,18 @@ class RequisicaoView(LoginRequiredMixin, View):
                 return render(request, self.template_name, self._contexto(request, form, produtos_disponiveis))
 
             titulo = form.cleaned_data.get('titulo')
+            dados_cabecalho = {
+                'unidade': form.cleaned_data['unidade'],
+                'solicitante': form.cleaned_data['solicitante'],
+                'data_solicitacao': form.cleaned_data['data_solicitacao'],
+                'itens': itens_finais,
+                'titulo': titulo,
+            }
             buffer = relatorios.relatorio_requisicao(
-                unidade=form.cleaned_data['unidade'],
-                solicitante=form.cleaned_data['solicitante'],
-                data_solicitacao=form.cleaned_data['data_solicitacao'],
-                itens=itens_finais,
-                titulo=titulo,
+                **dados_cabecalho,
+                # Dados assinados, invisíveis na impressão, que permitem ao
+                # posto importar este mesmo PDF na tela de Produtos.
+                dados_importacao=importacao.gerar_dados_pdf(**dados_cabecalho),
             )
             # Nome do arquivo usa o título (se preenchido) + a data, ex:
             # "requisicao_produtos_de_limpeza_22-09-2026.pdf". Sem título,
@@ -850,6 +857,127 @@ class RequisicaoView(LoginRequiredMixin, View):
             return response
 
         return render(request, self.template_name, self._contexto(request, form, produtos_disponiveis))
+
+
+# ---------------------------------------------------------------------------
+# Importação do PDF de Requisição (ver estoque/importacao.py)
+# ---------------------------------------------------------------------------
+
+class ImportarRequisicaoView(LoginRequiredMixin, View):
+    """
+    Recebe o PDF solto na tela de Produtos e mostra a tela de confirmação.
+    Nada é gravado aqui — só em ConfirmarImportacaoView, depois que o
+    usuário revisa os itens.
+    """
+    template_name = 'estoque/importar_requisicao_confirmar.html'
+
+    def post(self, request):
+        arquivo = request.FILES.get('arquivo')
+        if not arquivo:
+            messages.error(request, 'Selecione o PDF da requisição.')
+            return redirect('estoque:produto_list')
+        try:
+            token, dados = importacao.ler_dados_pdf(arquivo)
+            unidade = importacao.unidade_destino(dados, get_unidade_do_usuario(request.user))
+            importacao.verificar_nao_importada(dados)
+        except importacao.ImportacaoErro as exc:
+            messages.error(request, str(exc))
+            return redirect('estoque:produto_list')
+
+        linhas = importacao.montar_itens_confirmacao(dados, unidade)
+        return render(request, self.template_name, _contexto_confirmacao(token, dados, unidade, linhas))
+
+
+class ConfirmarImportacaoView(LoginRequiredMixin, View):
+    """Grava a importação revisada. Os dados do PDF voltam assinados no POST e são revalidados."""
+    template_name = 'estoque/importar_requisicao_confirmar.html'
+
+    def post(self, request):
+        token = request.POST.get('dados', '')
+        try:
+            dados = importacao.validar_token(token)
+            unidade = importacao.unidade_destino(dados, get_unidade_do_usuario(request.user))
+            importacao.verificar_nao_importada(dados)
+        except importacao.ImportacaoErro as exc:
+            messages.error(request, str(exc))
+            return redirect('estoque:produto_list')
+
+        linhas = importacao.montar_itens_confirmacao(dados, unidade)
+        if importacao.ler_escolhas(linhas, request.POST):
+            messages.error(request, 'Corrija os itens destacados antes de confirmar.')
+            return render(request, self.template_name, _contexto_confirmacao(token, dados, unidade, linhas))
+
+        try:
+            resumo = importacao.aplicar_importacao(dados, unidade, linhas, request.user)
+        except importacao.ImportacaoErro as exc:
+            messages.error(request, str(exc))
+            return render(request, self.template_name, _contexto_confirmacao(token, dados, unidade, linhas))
+
+        partes = []
+        if resumo['atualizados']:
+            partes.append(f'{resumo["atualizados"]} produto(s) atualizado(s)')
+        if resumo['novos']:
+            partes.append(f'{resumo["novos"]} produto(s) cadastrado(s)')
+        messages.success(request, f'Requisição importada: {" e ".join(partes)}.')
+        if resumo['divergencias']:
+            messages.warning(
+                request,
+                f'{resumo["divergencias"]} item(ns) com diferença no estoque da Secretaria — '
+                f'registrado(s) para conferência do administrador.',
+            )
+        return redirect('estoque:produto_list')
+
+
+def _contexto_confirmacao(token, dados, unidade, linhas):
+    return {
+        'token': token,
+        'unidade': unidade,
+        'titulo': dados.get('titulo') or 'Requisição de Materiais',
+        'solicitante': dados.get('solicitante'),
+        'data_solicitacao': importacao.data_solicitacao(dados),
+        'linhas': linhas,
+        'destino_novo': importacao.DESTINO_NOVO,
+        'itens_removidos': sum(1 for l in linhas if l['central'] is None),
+    }
+
+
+class DivergenciaListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
+    """
+    Diferenças entre o estoque do sistema e o físico da Secretaria,
+    registradas automaticamente ao importar requisições.
+    """
+    model = DivergenciaEstoque
+    template_name = 'estoque/divergencia_list.html'
+    context_object_name = 'divergencias'
+    paginate_by = 30
+
+    def get_queryset(self):
+        qs = DivergenciaEstoque.objects.select_related(
+            'produto', 'produto__unidade', 'importacao', 'importacao__unidade',
+            'importacao__usuario', 'resolvida_por',
+        )
+        self.mostrar_resolvidas = self.request.GET.get('resolvidas') == '1'
+        if not self.mostrar_resolvidas:
+            qs = qs.filter(resolvida=False)
+        return qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['mostrar_resolvidas'] = self.mostrar_resolvidas
+        return context
+
+
+class DivergenciaResolverView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Marca uma divergência como conferida (o ajuste de estoque em si é feito por Movimentação)."""
+
+    def post(self, request, pk):
+        divergencia = get_object_or_404(DivergenciaEstoque, pk=pk, resolvida=False)
+        divergencia.resolvida = True
+        divergencia.resolvida_por = request.user
+        divergencia.resolvida_em = timezone.now()
+        divergencia.save(update_fields=['resolvida', 'resolvida_por', 'resolvida_em'])
+        messages.success(request, f'Divergência de "{divergencia.produto.nome}" marcada como resolvida.')
+        return redirect('estoque:divergencia_list')
 
 
 # ---------------------------------------------------------------------------

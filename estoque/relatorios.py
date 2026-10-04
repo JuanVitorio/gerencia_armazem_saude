@@ -419,7 +419,7 @@ def relatorio_lancamentos_folgas(unidade=None, data_inicio=None, data_fim=None, 
 # NOVO: Requisição de Materiais (Lista de Faltantes)
 # ---------------------------------------------------------------------------
 
-def relatorio_requisicao(unidade, solicitante, data_solicitacao, itens, titulo=None):
+def relatorio_requisicao(unidade, solicitante, data_solicitacao, itens, titulo=None, dados_importacao=''):
     """
     Gera o PDF de Requisição de Materiais para impressão.
 
@@ -432,11 +432,16 @@ def relatorio_requisicao(unidade, solicitante, data_solicitacao, itens, titulo=N
     `itens` é uma lista de dicts: [{'produto': <Produto>, 'quantidade': int}, ...]
     `titulo` é opcional (ex: "Insumos", "Produtos de limpeza"); em branco,
     usa o título genérico "Requisição de Materiais".
+    `dados_importacao` é gravado no metadado "Keywords" do PDF (invisível na
+    impressão) para que o posto possa importar o próprio PDF depois — ver
+    estoque/importacao.py.
     """
     titulo = (titulo or '').strip() or 'Requisição de Materiais'
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
+        title=titulo,
+        keywords=dados_importacao,
         pagesize=A4,
         leftMargin=1.5 * cm,
         rightMargin=1.5 * cm,
