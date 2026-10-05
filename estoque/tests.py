@@ -10,7 +10,8 @@ from django.utils import timezone
 
 from .importacao import PREFIXO_METADADO
 from .models import (
-    Categoria, DivergenciaEstoque, ImportacaoRequisicao, Movimentacao, PerfilUsuario, Produto, Unidade,
+    Categoria, DivergenciaEstoque, ImportacaoRequisicao, Movimentacao, PerfilUsuario, Produto,
+    RascunhoRequisicao, Unidade,
 )
 from .relatorios import (
     relatorio_estoque_atual, relatorio_estoque_baixo,
@@ -277,3 +278,100 @@ class ImportacaoRequisicaoTests(TestCase):
         div.refresh_from_db()
         self.assertTrue(div.resolvida)
         self.assertEqual(div.resolvida_por, admin)
+
+
+class RascunhoRequisicaoTests(TestCase):
+    """Salvar a lista pela metade, voltar depois, editar e finalizar."""
+
+    def setUp(self):
+        self.secretaria = Unidade.objects.create(nome='Secretaria de Saúde', tipo=Unidade.SECRETARIA)
+        self.posto = Unidade.objects.create(nome='UBS Centro', tipo=Unidade.POSTO_SAUDE)
+        self.dipirona = Produto.objects.create(nome='Dipirona', unidade=self.secretaria, quantidade=100, unidade_medida='CX')
+        self.gaze = Produto.objects.create(nome='Gaze', unidade=self.secretaria, quantidade=50, unidade_medida='PC')
+        # Produto de outro estoque: não pode entrar na lista, nem em rascunho.
+        self.do_posto = Produto.objects.create(nome='Luva', unidade=self.posto, quantidade=5)
+
+        self.user = User.objects.create_user(username='posto', password='123')
+        PerfilUsuario.objects.create(usuario=self.user, unidade=self.posto)
+        self.client.force_login(self.user)
+        self.url = reverse('estoque:requisicao')
+
+    def _post(self, itens, **extra):
+        dados = {
+            'unidade': self.posto.pk, 'solicitante': 'Maria', 'titulo': 'Insumos',
+            'data_solicitacao': '2026-10-05', 'itens_json': json.dumps(itens),
+        }
+        dados.update(extra)
+        return self.client.post(self.url, dados)
+
+    def test_salva_rascunho_incompleto_sem_gerar_pdf_nem_movimentar_estoque(self):
+        resposta = self._post(
+            [{'produto_id': self.dipirona.pk, 'quantidade': 3, 'unidade_medida': 'CX'},
+             {'produto_id': self.do_posto.pk, 'quantidade': 1, 'unidade_medida': 'UN'}],
+            acao='rascunho', solicitante='',
+        )
+        rascunho = RascunhoRequisicao.objects.get()
+        self.assertRedirects(resposta, f'{self.url}?rascunho={rascunho.pk}')
+        self.assertEqual(rascunho.itens, [{'produto_id': self.dipirona.pk, 'quantidade': 3, 'unidade_medida': 'CX'}])
+        self.assertEqual((rascunho.titulo, rascunho.solicitante, rascunho.unidade), ('Insumos', '', self.posto))
+        self.assertFalse(Movimentacao.objects.exists())
+        self.dipirona.refresh_from_db()
+        self.assertEqual(self.dipirona.quantidade, 100)
+
+        # Lista vazia também pode ser salva.
+        self._post([], acao='rascunho')
+        self.assertEqual(RascunhoRequisicao.objects.count(), 2)
+
+    def test_continuar_editar_e_finalizar_rascunho(self):
+        self._post([{'produto_id': self.dipirona.pk, 'quantidade': 3, 'unidade_medida': 'CX'}], acao='rascunho')
+        rascunho = RascunhoRequisicao.objects.get()
+
+        # Voltando depois: a página reabre com o cabeçalho e os itens do rascunho.
+        resposta = self.client.get(self.url, {'rascunho': rascunho.pk})
+        form = resposta.context['form']
+        self.assertEqual(form.initial['titulo'], 'Insumos')
+        self.assertEqual(json.loads(form.initial['itens_json'])[0]['produto_id'], self.dipirona.pk)
+        self.assertEqual(resposta.context['rascunho'], rascunho)
+
+        # Alterando produtos/quantidades: atualiza o MESMO rascunho.
+        self._post(
+            [{'produto_id': self.dipirona.pk, 'quantidade': 5, 'unidade_medida': 'CX'},
+             {'produto_id': self.gaze.pk, 'quantidade': 2, 'unidade_medida': 'PC'}],
+            acao='rascunho', rascunho=rascunho.pk,
+        )
+        rascunho.refresh_from_db()
+        self.assertEqual(RascunhoRequisicao.objects.count(), 1)
+        self.assertEqual([i['quantidade'] for i in rascunho.itens], [5, 2])
+
+        # Finalizando: gera o PDF e o rascunho deixa de existir.
+        resposta = self._post(rascunho.itens, rascunho=rascunho.pk)
+        self.assertEqual(resposta['Content-Type'], 'application/pdf')
+        self.assertFalse(RascunhoRequisicao.objects.exists())
+
+    def test_gerar_pdf_com_erro_mantem_rascunho(self):
+        self._post([{'produto_id': self.dipirona.pk, 'quantidade': 3, 'unidade_medida': 'CX'}], acao='rascunho')
+        rascunho = RascunhoRequisicao.objects.get()
+        resposta = self._post(rascunho.itens, rascunho=rascunho.pk, solicitante='')
+        self.assertEqual(resposta.status_code, 200)
+        self.assertEqual(resposta.context['rascunho'], rascunho)
+        self.assertTrue(RascunhoRequisicao.objects.exists())
+
+    def test_rascunho_de_outro_usuario_nao_acessivel(self):
+        outro = User.objects.create_user(username='outro', password='123')
+        alheio = RascunhoRequisicao.objects.create(usuario=outro, titulo='Do outro')
+
+        self.assertEqual(self.client.get(self.url, {'rascunho': alheio.pk}).status_code, 404)
+        self.assertNotIn(alheio, self.client.get(self.url).context['rascunhos'])
+        self.client.post(reverse('estoque:rascunho_requisicao_delete', args=[alheio.pk]))
+        # Salvar apontando para o rascunho alheio cria um novo, sem tocar no dele.
+        self._post([], acao='rascunho', rascunho=alheio.pk, titulo='Meu')
+        alheio.refresh_from_db()
+        self.assertEqual(alheio.titulo, 'Do outro')
+        self.assertTrue(RascunhoRequisicao.objects.filter(usuario=self.user, titulo='Meu').exists())
+
+    def test_excluir_rascunho(self):
+        rascunho = RascunhoRequisicao.objects.create(usuario=self.user)
+        resposta = self.client.post(reverse('estoque:rascunho_requisicao_delete', args=[rascunho.pk]))
+        self.assertRedirects(resposta, self.url)
+        self.assertFalse(RascunhoRequisicao.objects.exists())
+

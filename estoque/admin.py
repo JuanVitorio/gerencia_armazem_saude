@@ -2,7 +2,7 @@ from django.contrib import admin, messages
 
 from .models import (
     Categoria, DivergenciaEstoque, EventoFolga, Funcionario, ImportacaoRequisicao, LancamentoFolga,
-    Movimentacao, PerfilUsuario, Produto, Unidade,
+    Movimentacao, PerfilUsuario, Produto, RascunhoRequisicao, Unidade,
 )
 
 
@@ -161,3 +161,10 @@ class DivergenciaEstoqueAdmin(admin.ModelAdmin):
     list_filter = ('tipo', 'resolvida')
     search_fields = ('produto__nome',)
     readonly_fields = ('criado_em',)
+
+
+@admin.register(RascunhoRequisicao)
+class RascunhoRequisicaoAdmin(admin.ModelAdmin):
+    list_display = ('__str__', 'usuario', 'unidade', 'total_itens', 'atualizado_em')
+    list_filter = ('unidade',)
+    search_fields = ('titulo', 'solicitante', 'usuario__username')

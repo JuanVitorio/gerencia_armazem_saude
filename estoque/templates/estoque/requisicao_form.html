@@ -33,6 +33,57 @@
         </div>
     </div>
 
+    <!-- Rascunhos salvos do usuário (fora do form principal: cada um tem o
+         seu próprio form de exclusão, e forms não podem ser aninhados). -->
+    {% if rascunhos %}
+    <div class="table-card mb-3" id="card-rascunhos">
+        <div class="table-card-header">
+            <span class="table-card-title"><i class="bi bi-pencil-square"></i> Rascunhos salvos</span>
+            {% if rascunho %}
+            <a href="{% url 'estoque:requisicao' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-plus-lg"></i> Nova lista
+            </a>
+            {% endif %}
+        </div>
+        <div class="table-responsive">
+            <table class="data-table">
+                <tbody>
+                {% for r in rascunhos %}
+                    <tr>
+                        <td>
+                            <strong>{{ r.titulo|default:'Requisição sem título' }}</strong>
+                            {% if rascunho and r.pk == rascunho.pk %}
+                            <span class="status-tag status-success"><i class="bi bi-pencil"></i> Editando agora</span>
+                            {% endif %}
+                            <span class="item-detail">
+                                {{ r.total_itens }} ite{{ r.total_itens|pluralize:'m,ns' }}
+                                · salvo em {{ r.atualizado_em|date:'d/m/Y H:i' }}
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            <div class="btn-group-compact">
+                                {% if not rascunho or r.pk != rascunho.pk %}
+                                <a href="?rascunho={{ r.pk }}" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-pencil"></i> Continuar
+                                </a>
+                                {% endif %}
+                                <form method="post" action="{% url 'estoque:rascunho_requisicao_delete' r.pk %}" class="m-0"
+                                      onsubmit="return confirm('Excluir este rascunho? Essa ação não pode ser desfeita.');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn-icon btn-icon-danger" title="Excluir rascunho">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Div dinamica para mensagens de alerta via JS -->
     <div id="js-alert-container"></div>
 
@@ -63,6 +114,8 @@
     <form method="post" id="form-requisicao" novalidate>
         {% csrf_token %}
         {{ form.itens_json }}
+        <!-- Rascunho em edição: ao salvar, atualiza o mesmo; ao gerar o PDF, ele é apagado. -->
+        <input type="hidden" name="rascunho" value="{{ rascunho.pk|default:'' }}">
 
         <!-- Cabeçalho: Unidade / Solicitante / Data -->
         <div class="form-card mb-3">
@@ -192,6 +245,13 @@
         </div>
 
         <div class="form-actions">
+            <!-- Salva a lista como está (pode estar incompleta) para continuar depois.
+                 type="button" de propósito: assim o Enter num campo continua
+                 acionando o "Gerar PDF" (único submit), e não o rascunho. -->
+            <input type="hidden" name="acao" id="input-acao" value="">
+            <button type="button" class="btn btn-outline-secondary" id="btn-salvar-rascunho">
+                <i class="bi bi-floppy"></i> Salvar rascunho
+            </button>
             <button type="submit" class="btn btn-success" id="btn-gerar-pdf">
                 <i class="bi bi-file-earmark-pdf-fill"></i> Gerar PDF para Impressão
             </button>
@@ -408,7 +468,18 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // Validação no envio
+    // Salvar rascunho: envia sem as validações de "gerar PDF" (form.submit()
+    // não dispara o evento submit) — um rascunho pode estar incompleto.
+    document.getElementById('btn-salvar-rascunho').addEventListener('click', function () {
+        atualizarJson();
+        document.getElementById('input-acao').value = 'rascunho';
+        this.disabled = true;
+        formEl.submit();
+    });
+
     formEl.addEventListener('submit', function (e) {
+        // Envio normal = gerar PDF (o rascunho usa formEl.submit(), que não passa por aqui).
+        document.getElementById('input-acao').value = '';
         var erros = [];
         alertContainer.innerHTML = '';
 

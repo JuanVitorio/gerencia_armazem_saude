@@ -325,7 +325,9 @@ class RequisicaoForm(BaseFormMixin, forms.Form):
         widget=forms.TextInput(attrs={'placeholder': 'Nome completo de quem está solicitando'}),
     )
     data_solicitacao = forms.DateField(
-        label='Data', widget=forms.DateInput(attrs={'type': 'date'}),
+        # format ISO: <input type="date"> só aceita AAAA-MM-DD — no formato
+        # local (05/10/2026) o campo aparecia vazio, inclusive ao abrir rascunho.
+        label='Data', widget=forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
     )
     titulo = forms.CharField(
         label='Título da Lista', max_length=100, required=False,
@@ -351,32 +353,43 @@ class RequisicaoForm(BaseFormMixin, forms.Form):
         if not isinstance(dados, list) or not dados:
             raise forms.ValidationError('Adicione ao menos um item à lista antes de gerar o PDF.')
 
-        codigos_validos = {codigo for codigo, _ in Produto.UNIDADE_CHOICES}
-
-        itens = []
-        for item in dados:
-            if not isinstance(item, dict):
-                continue
-            try:
-                produto_id = int(item.get('produto_id'))
-                quantidade = int(item.get('quantidade'))
-            except (TypeError, ValueError):
-                continue
-            if quantidade <= 0:
-                continue
-            # Unidade de requisição: opcional — o usuário pode requisitar em
-            # uma unidade de medida diferente da cadastrada no produto (ex:
-            # produto cadastrado em Caixa, mas requisitado em Unidade). Se
-            # vier em branco/inválida, RequisicaoView usa a do produto.
-            unidade_medida = item.get('unidade_medida')
-            if unidade_medida not in codigos_validos:
-                unidade_medida = None
-            itens.append({
-                'produto_id': produto_id,
-                'quantidade': quantidade,
-                'unidade_medida': unidade_medida,
-            })
-
+        itens = ler_itens_requisicao(dados)
         if not itens:
             raise forms.ValidationError('Nenhum item válido encontrado na lista.')
         return itens
+
+
+def ler_itens_requisicao(dados):
+    """
+    Normaliza a lista de itens da requisição vinda do cliente (JSON já
+    decodificado), descartando entradas inválidas. Usada tanto ao gerar o
+    PDF (RequisicaoForm) quanto ao salvar rascunho — que aceita lista vazia.
+    """
+    if not isinstance(dados, list):
+        return []
+    codigos_validos = {codigo for codigo, _ in Produto.UNIDADE_CHOICES}
+
+    itens = []
+    for item in dados:
+        if not isinstance(item, dict):
+            continue
+        try:
+            produto_id = int(item.get('produto_id'))
+            quantidade = int(item.get('quantidade'))
+        except (TypeError, ValueError):
+            continue
+        if quantidade <= 0:
+            continue
+        # Unidade de requisição: opcional — o usuário pode requisitar em
+        # uma unidade de medida diferente da cadastrada no produto (ex:
+        # produto cadastrado em Caixa, mas requisitado em Unidade). Se
+        # vier em branco/inválida, RequisicaoView usa a do produto.
+        unidade_medida = item.get('unidade_medida')
+        if unidade_medida not in codigos_validos:
+            unidade_medida = None
+        itens.append({
+            'produto_id': produto_id,
+            'quantidade': quantidade,
+            'unidade_medida': unidade_medida,
+        })
+    return itens

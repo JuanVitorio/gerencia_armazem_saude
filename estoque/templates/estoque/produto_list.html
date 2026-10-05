@@ -265,6 +265,11 @@
 
     if (!inputBusca || !tbody) return;
 
+    // Foco automático na pesquisa: o usuário já entra digitando. O cursor vai
+    // para o fim do texto, caso a página tenha carregado com uma busca na URL.
+    inputBusca.focus();
+    inputBusca.setSelectionRange(inputBusca.value.length, inputBusca.value.length);
+
     var timer = null;
     var modoAjax = false;
 

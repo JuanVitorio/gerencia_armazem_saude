@@ -412,6 +412,46 @@ class Movimentacao(models.Model):
 
 
 # ---------------------------------------------------------------------------
+# Rascunho de Requisição
+# ---------------------------------------------------------------------------
+
+class RascunhoRequisicao(models.Model):
+    """
+    Lista de requisição salva pela metade, para o usuário continuar depois.
+    Não é uma requisição: não gera PDF, não pode ser importada e não mexe
+    em estoque. Ao gerar o PDF a partir dele, o rascunho é apagado
+    (RequisicaoView.post). `itens` guarda a lista no mesmo formato do campo
+    itens_json do RequisicaoForm: [{produto_id, quantidade, unidade_medida}].
+    """
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='rascunhos_requisicao', verbose_name='Usuário',
+    )
+    unidade = models.ForeignKey(
+        Unidade, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='rascunhos_requisicao', verbose_name='Unidade solicitante',
+    )
+    titulo = models.CharField('Título', max_length=100, blank=True)
+    solicitante = models.CharField('Solicitante', max_length=150, blank=True)
+    data_solicitacao = models.DateField('Data', null=True, blank=True)
+    itens = models.JSONField('Itens', default=list, blank=True)
+    criado_em = models.DateTimeField('Criado em', auto_now_add=True)
+    atualizado_em = models.DateTimeField('Atualizado em', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Rascunho de Requisição'
+        verbose_name_plural = 'Rascunhos de Requisição'
+        ordering = ['-atualizado_em']
+
+    def __str__(self):
+        return self.titulo or f'Rascunho de {self.atualizado_em:%d/%m/%Y %H:%M}'
+
+    @property
+    def total_itens(self):
+        return len(self.itens)
+
+
+# ---------------------------------------------------------------------------
 # Importação de Requisição (PDF → estoque da unidade)
 # ---------------------------------------------------------------------------
 
