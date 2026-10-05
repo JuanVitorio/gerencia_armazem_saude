@@ -1,3 +1,4 @@
+import json
 import unicodedata
 from datetime import datetime, timedelta
 
@@ -24,11 +25,11 @@ from .forms import (
     EventoFolgaForm, FuncionarioFiltroForm, FuncionarioForm, LancamentoFolgaForm,
     MovimentacaoFiltroForm, MovimentacaoForm,
     PerfilUsuarioForm, ProdutoFiltroForm, ProdutoForm,
-    RequisicaoForm, UsuarioForm,
+    RequisicaoForm, UsuarioForm, ler_itens_requisicao,
 )
 from .models import (
     Categoria, DivergenciaEstoque, EventoFolga, Funcionario, LancamentoFolga, Movimentacao,
-    PerfilUsuario, Produto, Unidade,
+    PerfilUsuario, Produto, RascunhoRequisicao, Unidade,
 )
 
 
@@ -774,10 +775,13 @@ class RequisicaoView(LoginRequiredMixin, View):
             return Unidade.objects.filter(pk=unidade_usuario.pk)
         return None
 
-    def _contexto(self, request, form, produtos):
+    def _contexto(self, request, form, produtos, rascunho=None):
         return {
             'form': form,
             'produtos': produtos,
+            # Rascunho em edição (None = lista nova) e os rascunhos salvos do usuário.
+            'rascunho': rascunho,
+            'rascunhos': RascunhoRequisicao.objects.filter(usuario=request.user),
             'estoque_central': list(get_unidades_estoque_central()),
             # Opções de unidade de medida para o seletor por item da lista —
             # a unidade cadastrada no produto (ex: Caixa) é só a referência
@@ -794,15 +798,72 @@ class RequisicaoView(LoginRequiredMixin, View):
         if unidade_usuario is not None:
             initial['unidade'] = unidade_usuario.pk
 
+        # ?rascunho=<id>: continua a edição de um rascunho salvo — o cabeçalho
+        # e a lista voltam preenchidos (a lista é remontada pelo JS da página
+        # a partir de itens_json, o mesmo caminho usado após erro de validação).
+        rascunho = None
+        if request.GET.get('rascunho'):
+            rascunho = get_object_or_404(
+                RascunhoRequisicao, pk=request.GET['rascunho'], usuario=request.user,
+            )
+            if rascunho.solicitante:
+                initial['solicitante'] = rascunho.solicitante
+            if rascunho.data_solicitacao:
+                initial['data_solicitacao'] = rascunho.data_solicitacao
+            if rascunho.unidade_id and unidade_usuario is None:
+                initial['unidade'] = rascunho.unidade_id
+            initial['titulo'] = rascunho.titulo
+            initial['itens_json'] = json.dumps(rascunho.itens)
+
         form = RequisicaoForm(initial=initial, unidade_queryset=self._unidade_queryset(unidade_usuario))
         return render(request, self.template_name, self._contexto(
-            request, form, self._produtos_disponiveis(request),
+            request, form, self._produtos_disponiveis(request), rascunho,
         ))
+
+    def _salvar_rascunho(self, request, unidade_usuario, produtos_disponiveis):
+        """
+        Salva a lista como está, sem as validações de "gerar PDF" (campos
+        obrigatórios, ao menos 1 item): um rascunho pode estar incompleto.
+        Só os produtos do estoque central são mantidos, como no PDF.
+        """
+        rascunho = RascunhoRequisicao.objects.filter(
+            pk=request.POST.get('rascunho') or None, usuario=request.user,
+        ).first() or RascunhoRequisicao(usuario=request.user)
+
+        unidades = self._unidade_queryset(unidade_usuario)
+        if unidades is None:
+            unidades = Unidade.objects.filter(ativa=True)
+        rascunho.unidade = unidades.filter(pk=request.POST.get('unidade') or None).first()
+        rascunho.solicitante = request.POST.get('solicitante', '').strip()[:150]
+        rascunho.titulo = request.POST.get('titulo', '').strip()[:100]
+        try:
+            rascunho.data_solicitacao = datetime.strptime(request.POST.get('data_solicitacao', ''), '%Y-%m-%d').date()
+        except ValueError:
+            rascunho.data_solicitacao = None
+
+        try:
+            itens = ler_itens_requisicao(json.loads(request.POST.get('itens_json') or '[]'))
+        except ValueError:
+            itens = []
+        ids_validos = set(produtos_disponiveis.filter(
+            pk__in=[item['produto_id'] for item in itens],
+        ).values_list('pk', flat=True))
+        rascunho.itens = [item for item in itens if item['produto_id'] in ids_validos]
+        rascunho.save()
+
+        messages.success(request, f'Rascunho salvo com {rascunho.total_itens} item(ns). Você pode continuar depois.')
+        return redirect(f'{reverse("estoque:requisicao")}?rascunho={rascunho.pk}')
 
     def post(self, request):
         unidade_usuario = get_unidade_do_usuario(request.user)
-        form = RequisicaoForm(request.POST, unidade_queryset=self._unidade_queryset(unidade_usuario))
         produtos_disponiveis = self._produtos_disponiveis(request)
+        if request.POST.get('acao') == 'rascunho':
+            return self._salvar_rascunho(request, unidade_usuario, produtos_disponiveis)
+
+        form = RequisicaoForm(request.POST, unidade_queryset=self._unidade_queryset(unidade_usuario))
+        rascunho = RascunhoRequisicao.objects.filter(
+            pk=request.POST.get('rascunho') or None, usuario=request.user,
+        ).first()
 
         if form.is_valid():
             itens_brutos = form.cleaned_data['itens_json']
@@ -827,7 +888,7 @@ class RequisicaoView(LoginRequiredMixin, View):
 
             if not itens_finais:
                 messages.error(request, 'Nenhum item válido encontrado na lista. Adicione os itens novamente.')
-                return render(request, self.template_name, self._contexto(request, form, produtos_disponiveis))
+                return render(request, self.template_name, self._contexto(request, form, produtos_disponiveis, rascunho))
 
             titulo = form.cleaned_data.get('titulo')
             dados_cabecalho = {
@@ -854,9 +915,22 @@ class RequisicaoView(LoginRequiredMixin, View):
             # attachment (em vez de inline): dispara o download automático
             # ao gerar, em vez de abrir o PDF numa aba do navegador.
             response['Content-Disposition'] = f'attachment; filename="{nome_arquivo}"'
+            # Requisição finalizada: o rascunho de origem deixa de existir.
+            if rascunho is not None:
+                rascunho.delete()
             return response
 
-        return render(request, self.template_name, self._contexto(request, form, produtos_disponiveis))
+        return render(request, self.template_name, self._contexto(request, form, produtos_disponiveis, rascunho))
+
+
+class RascunhoRequisicaoDeleteView(LoginRequiredMixin, View):
+    """Descarta um rascunho de requisição do próprio usuário."""
+
+    def post(self, request, pk):
+        rascunho = get_object_or_404(RascunhoRequisicao, pk=pk, usuario=request.user)
+        rascunho.delete()
+        messages.success(request, f'Rascunho "{rascunho}" excluído.')
+        return redirect('estoque:requisicao')
 
 
 # ---------------------------------------------------------------------------

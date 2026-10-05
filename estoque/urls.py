@@ -34,6 +34,7 @@ urlpatterns = [
 
     # NOVO: Requisição de Materiais (Lista de Faltantes + Gerador de PDF)
     path('requisicao/', views.RequisicaoView.as_view(), name='requisicao'),
+    path('requisicao/rascunhos/<int:pk>/excluir/', views.RascunhoRequisicaoDeleteView.as_view(), name='rascunho_requisicao_delete'),
 
     # Divergências de estoque da Secretaria (admin only)
     path('divergencias/', views.DivergenciaListView.as_view(), name='divergencia_list'),
